@@ -1,15 +1,23 @@
 import CorrectBracketSequenceToken.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import editor.basic.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 
 
 private const val openingBrackets = "([{"
@@ -30,15 +38,15 @@ private sealed class CorrectBracketSequenceToken : SingleStyleToken() {
     class Bracket(
         val bracket: Char,
         override var style: SpanStyle = SpanStyle(),
-        override val scopeChange: ScopeChange
-    ) : CorrectBracketSequenceToken(), ScopeChangingToken<Bracket> {
+        final override val scopeChange: ScopeChange
+    ) : CorrectBracketSequenceToken(), ScopeChangingToken {
         private val alterBracket = when (scopeChange) {
             ScopeChange.OpensScope -> closingBrackets[openingBrackets.indexOf(bracket)]
             ScopeChange.ClosesScope -> openingBrackets[closingBrackets.indexOf(bracket)]
         }
         override val text: String get() = bracket.toString()
-        override fun matches(token: Bracket): Boolean =
-            token.scopeChange != this.scopeChange && token.bracket == this.alterBracket
+        override fun matches(token: Token): Boolean = token is Bracket &&
+                token.scopeChange != this.scopeChange && token.bracket == this.alterBracket
     }
 
     class Miscellaneous(val other: Char) : CorrectBracketSequenceToken() {
@@ -95,15 +103,78 @@ private fun tokenizationPipeline(textFieldState: TextFieldValue): BasicSourceCod
 fun CorrectBracketSequence() {
     var codeTextFieldState by remember { mutableStateOf(BasicSourceCodeTextFieldState<CorrectBracketSequenceToken>()) }
     val textStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace)
-    
+    val verticalState = rememberScrollState()
+    val matchedBrackets = matchBrackets<Bracket>(codeTextFieldState.tokens)
+    val indentationLines = getIndentationLines(codeTextFieldState, matchedBrackets, false)
+    val coroutineScope = rememberCoroutineScope()
+    val externalScrollToFlow = remember { MutableSharedFlow<SourceCodePosition>() }
+    val showLineNumbers by remember { mutableStateOf(true) }
+    val pinLines by remember { mutableStateOf(true) }
+    val showIndentation by remember { mutableStateOf(true) }
+    val textSize = measureText(textStyle)
+    val density = LocalDensity.current
+    val pinLinesChooser: (Bracket) -> IntRange? = { bracket ->
+        if (bracket.bracket in "{}") codeTextFieldState.tokenLines[bracket] else null
+    }
+    var maximumPinnedLinesHeight: Dp by remember { mutableStateOf(0.dp) }
+
     BasicSourceCodeTextField(
         state = codeTextFieldState,
         onStateUpdate = { codeTextFieldState = it },
-        tokenize = { tokenizationPipeline(it) },
         preprocessors = listOf({ replaceTabs(it) }),
+        tokenize = { tokenizationPipeline(it) },
+        additionalInnerComposable = {
+            AnimatedVisibility(showIndentation) {
+                IndentationLines(
+                    indentationLines = indentationLines,
+                    modifier = Modifier.background(color = Color.Gray),
+                    textStyle = textStyle,
+                )
+            }
+        },
+        manualScrollToPosition = externalScrollToFlow,
+        additionalOuterComposable = {
+            AnimatedVisibility(pinLines) {
+                PinnedLines(
+                    state = codeTextFieldState,
+                    textStyle = textStyle,
+                    scrollState = verticalState,
+                    showLineNumbers = showLineNumbers,
+                    matchedBrackets = matchedBrackets,
+                    pinLinesChooser = pinLinesChooser,
+                    maximumPinnedLinesHeight = (maxHeight / 3).also { maximumPinnedLinesHeight = it },
+                    onClick = { coroutineScope.launch { externalScrollToFlow.emit(SourceCodePosition(it, 0)) } },
+                    additionalInnerComposable = { linesToWrite ->
+                        AnimatedVisibility(showIndentation) {
+                            val lineMapping = linesToWrite.keys.withIndex().associate { (index, line) -> line to index }
+                            IndentationLines(
+                                indentationLines = indentationLines,
+                                modifier = Modifier.background(color = Color.Gray),
+                                textStyle = textStyle,
+                                mapLineNumbers = lineMapping::get,
+                            )
+                        }
+                    },
+                )
+            }
+        },
+        showLineNumbers = showLineNumbers,
         textStyle = textStyle,
-        additionalComposable = { state, textLayoutResult ->
-            IndentationLines(state, matchBrackets<Bracket>(state.tokens), textLayoutResult, textStyle = textStyle, modifier = Modifier.background(color = Color.Gray))
-        }
+        verticalScrollState = verticalState,
+        modifier = Modifier.fillMaxWidth().background(color = Color.White),
+        editorOffsetsForPosition = {
+            EditorOffsets(
+                top = getOffsetForLineToAppearOnTop(
+                    line = it.line,
+                    textSize = textSize,
+                    density = density,
+                    state = codeTextFieldState,
+                    matchedBrackets = matchedBrackets,
+                    dividerThickness = 0.dp, // do not include divider thickness in the calculation
+                    maximumPinnedLinesHeight = maximumPinnedLinesHeight,
+                    pinLinesChooser = pinLinesChooser,
+                )
+            )
+        },
     )
 }

@@ -16,9 +16,9 @@ val Token.text: String get() = annotatedString.text
 
 interface WhiteSpaceToken : Token
 
-interface ScopeChangingToken<T : Token> : Token {
+interface ScopeChangingToken : Token {
     val scopeChange: ScopeChange
-    fun matches(token: T): Boolean
+    fun matches(token: Token): Boolean
 }
 
 interface SymbolToken<T : Token> : Token {
