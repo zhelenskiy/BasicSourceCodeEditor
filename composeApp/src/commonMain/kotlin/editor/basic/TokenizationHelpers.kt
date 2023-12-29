@@ -23,7 +23,7 @@ fun <T : Token> getCurrentPositionTokens(
     }
 }
 
-inline fun <reified Bracket : ScopeChangingToken<Bracket>> matchBrackets(tokens: List<Token>): Map<Bracket, Bracket> {
+inline fun <reified Bracket : ScopeChangingToken> matchBrackets(tokens: List<Token>): Map<Bracket, Bracket> {
     val matchedBrackets = mutableMapOf<Bracket, Bracket>()
     val openingBracketsStack = mutableListOf<Bracket>()
     for (token in tokens) {
@@ -47,7 +47,7 @@ inline fun <reified Bracket : ScopeChangingToken<Bracket>> matchBrackets(tokens:
 fun <Bracket> updateMatchingBracketsStyle(
     openingToClosingBrackets: Map<Bracket, Bracket>,
     styleUpdator: (index: Int, openingStyle: SpanStyle, closingStyle: SpanStyle) -> Pair<SpanStyle, SpanStyle>
-) where Bracket : ScopeChangingToken<Bracket>, Bracket : SingleStyleToken {
+) where Bracket : ScopeChangingToken, Bracket : SingleStyleToken {
     openingToClosingBrackets.entries.forEachIndexed { index, (opening, closing) ->
         val (openingStyle, closingStyle) = styleUpdator(index, opening.style, closing.style)
         opening.style = openingStyle
@@ -60,7 +60,7 @@ inline fun <reified Bracket> updateMatchingBracesAtCurrentPositionStyle(
     matchedBrackets: Map<Bracket, Bracket>,
     bracketFilter: (List<Bracket>) -> List<Bracket> = { it },
     styleUpdater: (SpanStyle) -> SpanStyle,
-) where Bracket : ScopeChangingToken<Bracket>, Bracket : SingleStyleToken {
+) where Bracket : ScopeChangingToken, Bracket : SingleStyleToken {
     for (selectedToken in selectedTokens.filterIsInstance<Bracket>().let(bracketFilter)) {
         selectedToken.style = styleUpdater(selectedToken.style)
         matchedBrackets[selectedToken]?.let { it.style = styleUpdater(it.style) }
