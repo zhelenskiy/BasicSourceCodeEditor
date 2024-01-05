@@ -24,34 +24,46 @@ fun <T : Token> getCurrentPositionTokens(
 }
 
 inline fun <reified Bracket : ScopeChangingToken> matchBrackets(tokens: List<Token>): Map<Bracket, Bracket> {
-    val matchedBrackets = mutableMapOf<Bracket, Bracket>()
+    val unorderedMatchedBrackets = mutableMapOf<Bracket, Bracket>()
     val openingBracketsStack = mutableListOf<Bracket>()
+    val order = mutableListOf<Bracket>()
     for (token in tokens) {
         if (token is Bracket) {
+            order.add(token)
             when (token.scopeChange) {
                 ScopeChange.OpensScope -> openingBracketsStack.add(token)
                 ScopeChange.ClosesScope -> {
                     val opening = openingBracketsStack.lastOrNull() ?: continue
-                    if (opening.matches(token)) {
-                        matchedBrackets[opening] = token
-                        matchedBrackets[token] = opening
-                        openingBracketsStack.removeLast()
-                    }
+                    if (!opening.matches(token)) continue
+                    unorderedMatchedBrackets[opening] = token
+                    unorderedMatchedBrackets[token] = opening
+                    openingBracketsStack.removeLast()
                 }
             }
         }
     }
-    return matchedBrackets
+    return buildMap {
+        for (bracket in order) {
+            val matchingBracket = unorderedMatchedBrackets[bracket] ?: continue
+            put(bracket, matchingBracket)
+        }
+    }
 }
 
 fun <Bracket> updateMatchingBracketsStyle(
     openingToClosingBrackets: Map<Bracket, Bracket>,
-    styleUpdator: (index: Int, openingStyle: SpanStyle, closingStyle: SpanStyle) -> Pair<SpanStyle, SpanStyle>
+    styleUpdator: (index: Int, depth: Int, openingStyle: SpanStyle, closingStyle: SpanStyle) -> Pair<SpanStyle, SpanStyle>
 ) where Bracket : ScopeChangingToken, Bracket : SingleStyleToken {
+    var depth = 0
     openingToClosingBrackets.entries.forEachIndexed { index, (opening, closing) ->
-        val (openingStyle, closingStyle) = styleUpdator(index, opening.style, closing.style)
+        if (opening.scopeChange != ScopeChange.OpensScope) {
+            depth--
+            return@forEachIndexed
+        }
+        val (openingStyle, closingStyle) = styleUpdator(index, depth, opening.style, closing.style)
         opening.style = openingStyle
         closing.style = closingStyle
+        depth++
     }
 }
 

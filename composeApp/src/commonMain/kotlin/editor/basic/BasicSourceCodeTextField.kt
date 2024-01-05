@@ -5,11 +5,9 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Divider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
@@ -17,7 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
@@ -31,18 +30,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-sealed class SuspendResult<out T> {
-    data object NotStarted : SuspendResult<Nothing>()
-    data object InProgress : SuspendResult<Nothing>()
-    data class Success<out T>(val value: T) : SuspendResult<T>()
-    data class Failure(val throwable: Throwable) : SuspendResult<Nothing>()
-}
-
-val <T : Any> SuspendResult<T>.result
-    get() = when (this) {
-        is SuspendResult.Success -> value
-        SuspendResult.NotStarted, SuspendResult.InProgress, is SuspendResult.Failure -> null
-    }
 
 @Stable
 data class BasicSourceCodeTextFieldState<T : Token>(
@@ -113,23 +100,6 @@ data class BasicSourceCodeTextFieldState<T : Token>(
     }
 }
 
-sealed class FormattedCode<Token> {
-    abstract val selection: TextRange
-    abstract val composition: TextRange?
-
-    data class AsTokens<Token>(
-        val tokens: List<Token>,
-        override val selection: TextRange = TextRange.Zero,
-        override val composition: TextRange? = null,
-    ) : FormattedCode<Token>()
-
-    data class AsString<Token>(
-        val code: String,
-        override val selection: TextRange = TextRange.Zero,
-        override val composition: TextRange? = null,
-    ) : FormattedCode<Token>()
-}
-
 typealias Preprocessor = (TextFieldValue) -> TextFieldValue
 typealias Tokenizer<Token> = (TextFieldValue) -> BasicSourceCodeTextFieldState<Token>
 
@@ -141,6 +111,92 @@ expect fun Modifier.scrollOnPress(
 
 data class EditorOffsets(val top: Int = 0, val bottom: Int = 0, val start: Int = 0, val end: Int = 0)
 
+typealias CharEventHandler = (CharEvent) -> TextFieldValue?
+
+fun combineCharEventHandlers(vararg handlers: CharEventHandler): CharEventHandler =
+    { event -> handlers.firstNotNullOfOrNull { it(event) } }
+
+typealias KeyEventHandler = (KeyEvent) -> TextFieldValue?
+
+fun combineKeyEventHandlers(vararg handlers: KeyEventHandler): KeyEventHandler =
+    { event -> handlers.firstNotNullOfOrNull { it(event) } }
+
+sealed class CharEvent {
+    data class Insert(val char: Char) : CharEvent()
+    data object Backspace : CharEvent()
+    data object Misc : CharEvent()
+}
+
+private fun <T : Token> isBackSpace(oldState: BasicSourceCodeTextFieldState<T>, newState: TextFieldValue): Boolean {
+    if (isErasedSelectedContent(oldState, newState)) return true
+    if (oldState.selection.collapsed && oldState.selection.start > 0) {
+        return isErasedSelectedContent(
+            oldState.copy(
+                selection = TextRange(
+                    oldState.selection.end - 1,
+                    oldState.selection.end
+                )
+            ), newState
+        )
+    }
+    return false
+}
+
+private fun <T : Token> isErasedSelectedContent(
+    oldState: BasicSourceCodeTextFieldState<T>,
+    newState: TextFieldValue
+): Boolean {
+    if (!newState.selection.collapsed) return false
+    if (oldState.selection.collapsed) return false
+    if (newState.selection.min != oldState.selection.min) return false
+    if (newState.text.length != oldState.text.length - oldState.selection.length) return false
+    for (i in 0..<oldState.selection.min) {
+        if (newState.text[i] != oldState.text[i]) return false
+    }
+    for (i in oldState.selection.max..<oldState.text.length) {
+        if (newState.text[i - oldState.selection.length] != oldState.text[i]) return false
+    }
+    fun map(offset: Int) = when {
+        offset >= oldState.selection.max -> offset - oldState.selection.length
+        offset <= oldState.selection.min -> offset
+        else -> newState.selection.min
+    }
+    return when (val oldComposition = oldState.composition) {
+        null -> newState.composition == null
+        else -> when (val newComposition = newState.composition) {
+            null -> false
+            else -> newComposition.start == map(oldComposition.start) && newComposition.end == map(oldComposition.end)
+        }
+    }
+}
+
+private fun <T : Token> isCharInserted(
+    oldState: BasicSourceCodeTextFieldState<T>,
+    newState: TextFieldValue
+): Boolean {
+    if (!newState.selection.collapsed) return false
+    if (newState.selection.min != oldState.selection.min + 1) return false
+    if (newState.text.length != oldState.text.length - oldState.selection.length + 1) return false
+    for (i in 0..<oldState.selection.min) {
+        if (newState.text[i] != oldState.text[i]) return false
+    }
+    for (i in oldState.selection.max..<oldState.text.length) {
+        if (newState.text[i - oldState.selection.length + 1] != oldState.text[i]) return false
+    }
+    fun map(offset: Int) = when {
+        offset >= oldState.selection.max -> offset - oldState.selection.length + 1
+        offset <= oldState.selection.min -> offset
+        else -> newState.selection.min
+    }
+    return when (val oldComposition = oldState.composition) {
+        null -> newState.composition == null
+        else -> when (val newComposition = newState.composition) {
+            null -> false
+            else -> newComposition.start == map(oldComposition.start) && newComposition.end == map(oldComposition.end)
+        }
+    }
+}
+
 @Composable
 fun <T : Token> BasicSourceCodeTextField(
     state: BasicSourceCodeTextFieldState<T>,
@@ -149,14 +205,15 @@ fun <T : Token> BasicSourceCodeTextField(
     tokenize: Tokenizer<T>,
     additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
     additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
-    format: suspend (List<T>) -> FormattedCode<T> = { FormattedCode.AsTokens(it) },
     showLineNumbers: Boolean = true,
     textStyle: TextStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace),
     horizontalScrollState: ScrollState = rememberScrollState(),
     verticalScrollState: ScrollState = rememberScrollState(),
     modifier: Modifier = Modifier,
     editorOffsetsForPosition: (sourceCodePosition: SourceCodePosition) -> EditorOffsets = { EditorOffsets() },
-    manualScrollToPosition: SharedFlow<SourceCodePosition> = remember { MutableSharedFlow() }
+    manualScrollToPosition: SharedFlow<SourceCodePosition> = remember { MutableSharedFlow() },
+    charEventHandler: CharEventHandler = { null },
+    keyEventHandler: KeyEventHandler = { null },
 ) {
     val coroutineScope = rememberCoroutineScope()
     val textSize = measureText(textStyle)
@@ -238,7 +295,7 @@ fun <T : Token> BasicSourceCodeTextField(
                                 outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
                                 animationSpec = SpringSpec(stiffness = Spring.StiffnessHigh),
                                 offsets = editorOffsetsForPosition(position),
-                                )
+                            )
                         }
                     }
                 }
@@ -258,9 +315,31 @@ fun <T : Token> BasicSourceCodeTextField(
                     }
                 }
 
-                BoxWithConstraints(Modifier.horizontalScroll(horizontalScrollState)) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .horizontalScroll(horizontalScrollState)
+
+                ) {
                     val innerSizes = this
                     var textFieldSize: IntSize? by remember { mutableStateOf(null) }
+
+                    fun onValueChange(newTextFieldState: TextFieldValue) {
+                        val preprocessed =
+                            preprocessors.fold(newTextFieldState) { acc, preprocessor -> preprocessor(acc) }
+                        val charEvent = when {
+                            isBackSpace(state, newTextFieldState) -> CharEvent.Backspace
+                            isCharInserted(
+                                state,
+                                newTextFieldState
+                            ) -> CharEvent.Insert(char = newTextFieldState.text[newTextFieldState.selection.start - 1])
+
+                            else -> CharEvent.Misc
+                        }
+                        val handledAsCharEvent = charEventHandler(charEvent) ?: preprocessed
+                        val newState = tokenize(handledAsCharEvent)
+                        onStateUpdate(newState)
+                        shouldCursorBeVisible = true
+                    }
 
                     BasicTextField(
                         value = TextFieldValue(
@@ -268,12 +347,7 @@ fun <T : Token> BasicSourceCodeTextField(
                             selection = state.selection,
                             composition = state.composition,
                         ),
-                        onValueChange = {
-                            val newState = tokenize(preprocessors.fold(it) { acc, preprocessor -> preprocessor(acc) })
-                            val position = newState.sourceCodePositions[newState.selection.end]
-                            onStateUpdate(newState)
-                            shouldCursorBeVisible = true
-                        },
+                        onValueChange = { onValueChange(it) },
                         maxLines = Int.MAX_VALUE,
                         textStyle = textStyle,
                         cursorBrush = SolidColor(Color.Black),
@@ -281,7 +355,16 @@ fun <T : Token> BasicSourceCodeTextField(
                         modifier = Modifier
                             .widthIn(min = editorOuterWidth)
                             .scrollOnPress(coroutineScope, verticalScrollState, horizontalScrollState)
-                            .onSizeChanged { textFieldSize = it },
+                            .onSizeChanged { textFieldSize = it }
+                            .onPreviewKeyEvent {
+                                when (val eventResult = keyEventHandler(it)) {
+                                    null -> false
+                                    else -> {
+                                        onValueChange(eventResult)
+                                        true
+                                    }
+                                }
+                            },
                     )
                     innerSizes.additionalInnerComposable(textLayout)
                 }
@@ -320,7 +403,9 @@ private suspend fun scrollTo(
     offsets: EditorOffsets = EditorOffsets(),
 ) = coroutineScope {
     val scroll: suspend ScrollState.(Int) -> Unit =
-        if (animationSpec == null) ScrollState::scrollTo else { { animateScrollTo(it, animationSpec) }}
+        if (animationSpec == null) ScrollState::scrollTo else {
+            { animateScrollTo(it, animationSpec) }
+        }
     launch {
         for (n in 5 downTo 0) {
             val linesToShowBefore = n
@@ -387,254 +472,3 @@ private fun isCursorVisible(
 }
 
 data class SourceCodePosition(val line: Int, val column: Int)
-
-fun <Bracket : ScopeChangingToken, T : Token> getIndentationLines(
-    state: BasicSourceCodeTextFieldState<T>,
-    matchedBrackets: Map<Bracket, Bracket>,
-    distinct: Boolean = false,
-): List<SourceCodePosition> = buildList {
-    for ((opening, closing) in matchedBrackets) {
-        if (opening.scopeChange != ScopeChange.OpensScope) continue
-        val openingLines = state.tokenLines[opening as T] ?: continue
-        val closingLines = state.tokenLines[closing as T] ?: continue
-        val originalRange = (openingLines.last + 1)..closingLines.first
-        val columnOffset =
-            (openingLines.first..openingLines.last).mapNotNull { state.lineOffsets[it] }.minOrNull() ?: continue
-        for (line in originalRange) {
-            val offset = state.lineOffsets[line]
-            if (offset == null || offset > columnOffset) {
-                add(SourceCodePosition(line, columnOffset))
-            }
-        }
-    }
-}.let { if (distinct) it.distinct() else it }
-
-
-@Composable
-fun BoxScope.IndentationLines(
-    indentationLines: List<SourceCodePosition>,
-    modifier: Modifier,
-    width: Dp = 1.dp,
-    textStyle: TextStyle,
-    mapLineNumbers: (Int) -> Int? = { it },
-) {
-    val measuredText = measureText(textStyle)
-    val letterHeight = measuredText.height
-    val letterWidth = measuredText.width
-
-    for ((line, column) in indentationLines) {
-        val realLine = mapLineNumbers(line) ?: continue
-        val bottom = letterHeight * realLine.inc()
-        val end = letterWidth * column
-        with(LocalDensity.current) {
-            Box(Modifier.size(end.toDp() + width / 2, bottom.toDp()), Alignment.BottomEnd) {
-                Spacer(
-                    modifier = modifier
-                        .width(width)
-                        .height(letterHeight.toDp())
-                )
-            }
-        }
-    }
-}
-
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
-    line: Int,
-    state: BasicSourceCodeTextFieldState<T>,
-    matchedBrackets: Map<Bracket, Bracket>,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
-): Set<Int> {
-    val lineUsages = IntArray(state.offsets.size)
-    var topLine = line
-    var tokenIndex = 0
-    val openedBracketLines = buildSet<Bracket> {
-        while (true) {
-            val oldSize = size
-            val lastAdded = mutableSetOf<Bracket>()
-            val lastRemoved = mutableSetOf<Bracket>()
-            while (tokenIndex < state.tokens.size) {
-                val token = state.tokens[tokenIndex]
-                if ((state.tokenPositions[token] ?: continue).second.line >= topLine) break
-                if (token is Bracket) {
-                    val (start, end) = state.tokenPositions[token] ?: continue
-                    when (token.scopeChange) {
-                        ScopeChange.OpensScope -> {
-                            add(token)
-                            lastAdded.add(token)
-                            for (i in start.line..end.line) {
-                                lineUsages[i]++
-                            }
-                        }
-
-                        ScopeChange.ClosesScope -> {
-                            val openingBracket = matchedBrackets[token]
-                            if (openingBracket != null && remove(openingBracket)) {
-                                lastRemoved.add(openingBracket)
-                                for (i in start.line..end.line) {
-                                    lineUsages[i]--
-                                }
-                            }
-                        }
-                    }
-                }
-                tokenIndex++
-            }
-            val newSize = size
-            val diff = newSize - oldSize
-            if (diff <= 0) {
-                lastAdded.forEach { remove(it) }
-                break
-            }
-            topLine += diff
-        }
-    }
-    return openedBracketLines.flatMapTo(mutableSetOf()) { bracket ->
-        pinLinesChooser(bracket) ?: IntRange.EMPTY
-    }.sorted().toSet()
-}
-
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetForLineToAppearOnTop(
-    line: Int,
-    textSize: Size,
-    density: Density,
-    state: BasicSourceCodeTextFieldState<T>,
-    matchedBrackets: Map<Bracket, Bracket>,
-    dividerThickness: Dp,
-    maximumPinnedLinesHeight: Dp,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
-): Int {
-    val resultLine = (line downTo 0).firstOrNull { attemptLine ->
-        val height = getPinnedLinesHeight(
-            attemptLine,
-            textSize,
-            density,
-            state,
-            matchedBrackets,
-            dividerThickness,
-            maximumPinnedLinesHeight,
-            pinLinesChooser
-        )
-        (line - attemptLine) * textSize.height >= height
-    } ?: 0
-    return ((line - resultLine) * textSize.height).roundToInt()
-}
-
-
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLinesHeight(
-    line: Int,
-    textSize: Size,
-    density: Density,
-    state: BasicSourceCodeTextFieldState<T>,
-    matchedBrackets: Map<Bracket, Bracket>,
-    dividerThickness: Dp,
-    maximumPinnedLinesHeight: Dp,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
-): Int {
-    val pinnedLines = getPinnedLines<Bracket, T>(line, state, matchedBrackets, pinLinesChooser)
-    if (pinnedLines.isEmpty()) return 0
-    return with(density) {
-        minOf(pinnedLines.size * textSize.height + dividerThickness.toPx(), maximumPinnedLinesHeight.toPx())
-    }.roundToInt()
-}
-
-@Composable
-inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsScope.PinnedLines(
-    state: BasicSourceCodeTextFieldState<T>,
-    textStyle: TextStyle,
-    scrollState: ScrollState,
-    showLineNumbers: Boolean,
-    matchedBrackets: Map<Bracket, Bracket>,
-    dividerThickness: Dp = 1.dp,
-    maximumPinnedLinesHeight: Dp = maxHeight / 3,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
-    crossinline onClick: (lineNumber: Int) -> Unit = {},
-    crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>) -> Unit = { },
-) {
-    val measuredText = measureText(textStyle)
-    val textHeightDp = with(LocalDensity.current) { measuredText.height.toDp() }
-    val topVisibleRow = (scrollState.value / measuredText.height).toInt()
-    val requestedLinesSet = getPinnedLines(topVisibleRow, state, matchedBrackets, pinLinesChooser)
-    if (requestedLinesSet.isEmpty()) return
-    Column(Modifier.heightIn(max = maximumPinnedLinesHeight)) {
-        Row(
-            modifier = Modifier
-                .width(this@PinnedLines.maxWidth)
-                .verticalScroll(rememberScrollState())
-                .background(Color.White)
-        ) {
-            val lineCount: Int = state.offsets.size
-            val linesToWrite = requestedLinesSet.associateWith { lineNumber ->
-                val lineOffsets =
-                    state.offsets[lineNumber].takeIf { it.isNotEmpty() } ?: return@associateWith AnnotatedString("")
-                val lastOffset =
-                    if (lineOffsets.last() == state.text.lastIndex) state.text.length else lineOffsets.last()
-                buildAnnotatedString {
-                    append(state.annotatedString, lineOffsets.first(), lastOffset)
-                }
-            }
-            AnimatedVisibility(showLineNumbers) {
-                Column {
-                    for ((lineNumber, _) in linesToWrite) {
-                        Row(modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { onClick(lineNumber) }
-                            )
-                        ) {
-                            val lineNumbersWidth = with(LocalDensity.current) {
-                                (lineCount.toString().length * measuredText.width).toDp()
-                            }
-                            Box(Modifier.width(lineNumbersWidth)) {
-                                BasicText(
-                                    text = "${lineNumber.inc()}",
-                                    style = textStyle,
-                                    modifier = Modifier.align(Alignment.CenterEnd).height(textHeightDp)
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                        }
-                    }
-                }
-            }
-            BoxWithConstraints {
-                val outerScope = this
-                BoxWithConstraints(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    val innerScope = this
-                    var maxWidth by remember { mutableStateOf(outerScope.maxWidth) }
-                    Column {
-                        for ((lineNumber, annotatedString) in linesToWrite) {
-                            Box(
-                                modifier = Modifier
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = { onClick(lineNumber) }
-                                    )
-                                    .fillMaxWidth()
-                            ) {
-                                BasicText(
-                                    text = annotatedString,
-                                    style = textStyle,
-                                    modifier = Modifier
-                                        .height(textHeightDp)
-                                        .widthIn(min = maxWidth)
-                                        .layout { measurable, constraints ->
-                                            val placeable = measurable.measure(constraints)
-                                            maxWidth = max(maxWidth, placeable.width.toDp())
-
-                                            layout(placeable.width, placeable.height) {
-                                                placeable.placeRelative(0, 0)
-                                            }
-                                        },
-                                )
-                            }
-                        }
-                    }
-                    innerScope.additionalInnerComposable(linesToWrite)
-                }
-            }
-        }
-        Divider(thickness = dividerThickness)
-    }
-}
