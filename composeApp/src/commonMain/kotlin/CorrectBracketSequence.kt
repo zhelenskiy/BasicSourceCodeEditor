@@ -84,8 +84,8 @@ private fun tokenizationPipeline(textFieldState: TextFieldValue): BasicSourceCod
     val matchingBrackets = matchBrackets<Bracket>(tokens)
 
     val colors = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Cyan, Color.Magenta)
-    updateMatchingBracketsStyle(matchingBrackets) { index, openingStyle, closingStyle ->
-        openingStyle.copy(color = colors[index % colors.size]) to closingStyle.copy(color = colors[index % colors.size])
+    updateMatchingBracketsStyle(matchingBrackets) { _, depth, openingStyle, closingStyle ->
+        openingStyle.copy(color = colors[depth % colors.size]) to closingStyle.copy(color = colors[depth % colors.size])
     }
 
     val currentTokens = getCurrentPositionTokens(textFieldState.selection, tokens)
@@ -176,5 +176,99 @@ fun CorrectBracketSequence() {
                 )
             )
         },
+        keyEventHandler = combineKeyEventHandlers(
+            handleMovingOffsets(
+                state = codeTextFieldState,
+            )
+        ),
+        charEventHandler = combineCharEventHandlers(
+            reusingCharsEventHandler(
+                textFieldState = codeTextFieldState,
+                chars = "])>}",
+            ),
+            openingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingChar = '[',
+                openingBracket = "[",
+                closingBracket = "]",
+                addNewLinesForSelection = { false },
+            ),
+            closingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "[",
+                closingBracket = "]",
+                closingChar = ']',
+                matchedBrackets = matchedBrackets,
+            ),
+            openingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingChar = '(',
+                openingBracket = "(",
+                closingBracket = ")",
+                addNewLinesForSelection = { false },
+            ),
+            closingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "(",
+                closingBracket = ")",
+                closingChar = ')',
+                matchedBrackets = matchedBrackets,
+            ),
+            openingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingChar = '<',
+                openingBracket = "<",
+                closingBracket = ">",
+                addNewLinesForSelection = { false },
+            ),
+            closingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "<",
+                closingBracket = ">",
+                closingChar = '>',
+                matchedBrackets = matchedBrackets,
+            ),
+            openingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingChar = '{',
+                openingBracket = "{",
+                closingBracket = "}",
+                addNewLinesForSelection = { true },
+            ),
+            closingBracketCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "{",
+                closingBracket = "}",
+                closingChar = '}',
+                matchedBrackets = matchedBrackets,
+            ),
+            newLineCharEventHandler(
+                textFieldState = codeTextFieldState,
+                matchedBrackets = matchedBrackets,
+            ),
+            removeIndentBackPressCharEventHandler(
+                textFieldState = codeTextFieldState,
+            ),
+            removeEmptyBracesBackPressCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "[",
+                closingBracket = "]",
+            ),
+            removeEmptyBracesBackPressCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "(",
+                closingBracket = ")",
+            ),
+            removeEmptyBracesBackPressCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "<",
+                closingBracket = ">",
+            ),
+            removeEmptyBracesBackPressCharEventHandler(
+                textFieldState = codeTextFieldState,
+                openingBracket = "{",
+                closingBracket = "}",
+            ),
+        ),
     )
 }
