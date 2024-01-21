@@ -1,10 +1,12 @@
 package editor.basic
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,4 +29,13 @@ actual fun Modifier.scrollOnPress(
             }
         }
     }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+actual fun Modifier.tooltip(
+    onOffsetChange: (IntOffset) -> Unit
+): Modifier = onPointerEvent(PointerEventType.Move) {
+    val newOffset = it.changes.first().position.let { (x, y) -> IntOffset(x.toInt(), y.toInt()) }
+    onOffsetChange(newOffset)
 }

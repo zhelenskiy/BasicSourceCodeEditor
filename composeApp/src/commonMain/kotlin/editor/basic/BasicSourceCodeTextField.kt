@@ -8,12 +8,18 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -21,6 +27,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.*
 import kotlinx.coroutines.CoroutineScope
@@ -205,8 +213,10 @@ fun <T : Token> BasicSourceCodeTextField(
     tokenize: Tokenizer<T>,
     additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
     additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
-    showLineNumbers: Boolean = true,
     textStyle: TextStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace),
+    cursorBrush: Brush = SolidColor(Color.Black),
+    showLineNumbers: Boolean = true,
+    lineNumbersTextStyle: TextStyle = textStyle,
     horizontalScrollState: ScrollState = rememberScrollState(),
     verticalScrollState: ScrollState = rememberScrollState(),
     modifier: Modifier = Modifier,
@@ -214,6 +224,10 @@ fun <T : Token> BasicSourceCodeTextField(
     manualScrollToPosition: SharedFlow<SourceCodePosition> = remember { MutableSharedFlow() },
     charEventHandler: CharEventHandler = { null },
     keyEventHandler: KeyEventHandler = { null },
+    onHoveredSourceCodePositionChange: (offset: IntOffset, position: SourceCodePosition) -> Unit = { _, _ -> },
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    onFocusChanged: (FocusState) -> Unit = {},
+    thresholdLines: Int = 5,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val textSize = measureText(textStyle)
@@ -231,7 +245,7 @@ fun <T : Token> BasicSourceCodeTextField(
                         repeat(state.offsets.size) {
                             BasicText(
                                 text = "${it.inc()}",
-                                style = textStyle,
+                                style = lineNumbersTextStyle,
                                 modifier = Modifier.height(textHeightDp),
                             )
                         }
@@ -278,6 +292,7 @@ fun <T : Token> BasicSourceCodeTextField(
                                 outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
                                 outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
                                 offsets = editorOffsetsForPosition(position),
+                                thresholdLines = thresholdLines,
                             )
                         }
                     }
@@ -295,6 +310,7 @@ fun <T : Token> BasicSourceCodeTextField(
                                 outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
                                 animationSpec = SpringSpec(stiffness = Spring.StiffnessHigh),
                                 offsets = editorOffsetsForPosition(position),
+                                thresholdLines = thresholdLines,
                             )
                         }
                     }
@@ -310,6 +326,7 @@ fun <T : Token> BasicSourceCodeTextField(
                                 outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
                                 outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
                                 offsets = editorOffsetsForPosition(it),
+                                thresholdLines = thresholdLines,
                             )
                         }
                     }
@@ -328,10 +345,8 @@ fun <T : Token> BasicSourceCodeTextField(
                             preprocessors.fold(newTextFieldState) { acc, preprocessor -> preprocessor(acc) }
                         val charEvent = when {
                             isBackSpace(state, newTextFieldState) -> CharEvent.Backspace
-                            isCharInserted(
-                                state,
-                                newTextFieldState
-                            ) -> CharEvent.Insert(char = newTextFieldState.text[newTextFieldState.selection.start - 1])
+                            isCharInserted(state, newTextFieldState) ->
+                                CharEvent.Insert(char = newTextFieldState.text[newTextFieldState.selection.start - 1])
 
                             else -> CharEvent.Misc
                         }
@@ -350,7 +365,12 @@ fun <T : Token> BasicSourceCodeTextField(
                         onValueChange = { onValueChange(it) },
                         maxLines = Int.MAX_VALUE,
                         textStyle = textStyle,
-                        cursorBrush = SolidColor(Color.Black),
+                        keyboardOptions = KeyboardOptions.Default.copy(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false,
+                            keyboardType = KeyboardType.Ascii,
+                        ),
+                        cursorBrush = cursorBrush,
                         onTextLayout = { textLayout = it },
                         modifier = Modifier
                             .widthIn(min = editorOuterWidth)
@@ -364,7 +384,16 @@ fun <T : Token> BasicSourceCodeTextField(
                                         true
                                     }
                                 }
-                            },
+                            }
+                            .tooltip {
+                                val sourceCodePosition = SourceCodePosition(
+                                    line = (it.y / textSize.height).toInt(),
+                                    column = (it.x / textSize.width).toInt()
+                                )
+                                onHoveredSourceCodePositionChange(it, sourceCodePosition)
+                            }
+                            .focusRequester(focusRequester)
+                            .onFocusChanged(onFocusChanged),
                     )
                     innerSizes.additionalInnerComposable(textLayout)
                 }
@@ -373,6 +402,11 @@ fun <T : Token> BasicSourceCodeTextField(
         additionalOuterComposable(textLayout)
     }
 }
+
+@Composable
+expect fun Modifier.tooltip(
+    onOffsetChange: (IntOffset) -> Unit
+): Modifier
 
 @Composable
 fun measureText(codeTextStyle: TextStyle): Size {
@@ -401,13 +435,14 @@ private suspend fun scrollTo(
     outerEditorHeightPx: Int,
     animationSpec: AnimationSpec<Float>? = SpringSpec(),
     offsets: EditorOffsets = EditorOffsets(),
+    thresholdLines: Int = 5,
 ) = coroutineScope {
     val scroll: suspend ScrollState.(Int) -> Unit =
         if (animationSpec == null) ScrollState::scrollTo else {
             { animateScrollTo(it, animationSpec) }
         }
     launch {
-        for (n in 5 downTo 0) {
+        for (n in thresholdLines downTo 0) {
             val linesToShowBefore = n
             val linesToShowAfter = n
             val lineHeight = textSize.height
@@ -427,7 +462,7 @@ private suspend fun scrollTo(
         }
     }
     launch {
-        for (n in 5 downTo 0) {
+        for (n in thresholdLines downTo 0) {
             val lineWidth = textSize.width
             val charsToShowBefore = n
             val charsToShowAfter = n
