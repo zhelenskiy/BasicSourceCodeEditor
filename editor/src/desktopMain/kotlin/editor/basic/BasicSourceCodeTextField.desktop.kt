@@ -12,7 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalComposeUiApi::class)
-actual fun Modifier.scrollOnPress(
+internal actual fun Modifier.scrollOnPress(
     coroutineScope: CoroutineScope,
     verticalScrollState: ScrollState,
     horizontalScrollState: ScrollState
@@ -33,7 +33,8 @@ actual fun Modifier.scrollOnPress(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-actual fun Modifier.tooltip(
+@PublishedApi
+internal actual fun Modifier.onPointerOffsetChange(
     onOffsetChange: (IntOffset) -> Unit
 ): Modifier = onPointerEvent(PointerEventType.Move) {
     val newOffset = it.changes.first().position.let { (x, y) -> IntOffset(x.toInt(), y.toInt()) }

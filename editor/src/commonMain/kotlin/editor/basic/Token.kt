@@ -4,31 +4,30 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 
 
-enum class ScopeChange {
-                       OpensScope, ClosesScope
+public enum class ScopeChange {
+    OpensScope, ClosesScope
 }
 
-interface Token {
-    val annotatedString: AnnotatedString
+public interface Token {
+    public val annotatedString: AnnotatedString
 }
 
-val Token.text: String get() = annotatedString.text
+public val Token.text: String get() = annotatedString.text
 
-interface WhiteSpaceToken : Token
+public interface WhiteSpaceToken : Token
 
-interface ScopeChangingToken : Token {
-    val scopeChange: ScopeChange
-    fun matches(token: Token): Boolean
+public interface ScopeChangingToken : Token {
+    public val scopeChange: ScopeChange
+    public fun matches(token: Token): Boolean
 }
 
-interface SymbolToken<T : Token> : Token {
-    fun isSameSymbolWith(symbol: T): Boolean
+public interface SymbolToken<T : Token> : Token {
+    public fun isSameSymbolWith(symbol: T): Boolean
 }
 
-abstract class SingleStyleToken : Token {
-    abstract val text: String
-    open var style: SpanStyle = SpanStyle()
-    override fun toString(): String = text
+public interface SingleStyleToken : Token {
+    public val text: String
+    public var style: SpanStyle
     override val annotatedString: AnnotatedString
         get() = AnnotatedString(text, style)
 }

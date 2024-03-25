@@ -23,9 +23,10 @@ import kotlinx.coroutines.launch
 private const val openingBrackets = "([{"
 private const val closingBrackets = ")]}"
 
-private sealed class CorrectBracketSequenceToken : SingleStyleToken() {
+private sealed class CorrectBracketSequenceToken : SingleStyleToken {
     class WhiteSpace(val whiteSpace: Char) : CorrectBracketSequenceToken(), WhiteSpaceToken {
         override val text: String = whiteSpace.toString()
+        override var style: SpanStyle = SpanStyle()
     }
 
     class Identifier(
@@ -38,7 +39,7 @@ private sealed class CorrectBracketSequenceToken : SingleStyleToken() {
     class Bracket(
         val bracket: Char,
         override var style: SpanStyle = SpanStyle(),
-        final override val scopeChange: ScopeChange
+        override val scopeChange: ScopeChange
     ) : CorrectBracketSequenceToken(), ScopeChangingToken {
         private val alterBracket = when (scopeChange) {
             ScopeChange.OpensScope -> closingBrackets[openingBrackets.indexOf(bracket)]
@@ -51,6 +52,7 @@ private sealed class CorrectBracketSequenceToken : SingleStyleToken() {
 
     class Miscellaneous(val other: Char) : CorrectBracketSequenceToken() {
         override val text: String = other.toString()
+        override var style: SpanStyle = SpanStyle()
     }
 }
 
@@ -118,6 +120,7 @@ fun CorrectBracketSequence() {
     }
     var maximumPinnedLinesHeight: Dp by remember { mutableStateOf(0.dp) }
 
+    val lineNumbersColor = Color.DarkGray
     BasicSourceCodeTextField(
         state = codeTextFieldState,
         onStateUpdate = { codeTextFieldState = it },
@@ -132,12 +135,15 @@ fun CorrectBracketSequence() {
                 )
             }
         },
+        lineNumbersColor = lineNumbersColor,
         manualScrollToPosition = externalScrollToFlow,
         additionalOuterComposable = {
             AnimatedVisibility(pinLines) {
                 PinnedLines(
                     state = codeTextFieldState,
                     textStyle = textStyle,
+                    lineNumbersColor = lineNumbersColor,
+                    backgroundColor = Color.White,
                     scrollState = verticalState,
                     showLineNumbers = showLineNumbers,
                     matchedBrackets = matchedBrackets,

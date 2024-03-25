@@ -4,7 +4,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
 
-fun <T : Token> openingBracketCharEventHandler(
+public fun <T : Token> openingBracketCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     openingChar: Char, openingBracket: String, closingBracket: String,
     addNewLinesForSelection: (CharEvent.Insert) -> Boolean = { false },
@@ -95,7 +95,7 @@ fun <T : Token> openingBracketCharEventHandler(
     TextFieldValue(newString, newSelection, newComposition)
 }
 
-inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBracketCharEventHandler(
+public inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBracketCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     openingBracket: String, closingChar: Char, closingBracket: String,
@@ -145,7 +145,7 @@ inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBracketCharE
     )
 }
 
-fun <T : Token> reusingCharsEventHandler(
+public fun <T : Token> reusingCharsEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     chars: String,
 ): CharEventHandler = f@{ keyEvent ->
@@ -161,7 +161,7 @@ fun <T : Token> reusingCharsEventHandler(
     )
 }
 
-inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newLineCharEventHandler(
+public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newLineCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     indent: String = " ".repeat(4),
@@ -230,7 +230,7 @@ inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newLineChar
     )
 }
 
-fun <T : Token> removeIndentBackPressCharEventHandler(
+public fun <T : Token> removeIndentBackPressCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4),
 ): CharEventHandler = f@{ keyEvent ->
@@ -256,7 +256,7 @@ fun <T : Token> removeIndentBackPressCharEventHandler(
     )
 }
 
-fun <T : Token> removeEmptyBracesBackPressCharEventHandler(
+public fun <T : Token> removeEmptyBracesBackPressCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     openingBracket: String,
     closingBracket: String,

@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.max
 import kotlin.math.roundToInt
 
 
-fun <Bracket : ScopeChangingToken, T : Token> getIndentationLines(
+public fun <Bracket : ScopeChangingToken, T : Token> getIndentationLines(
     state: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     distinct: Boolean = false,
@@ -46,7 +46,7 @@ fun <Bracket : ScopeChangingToken, T : Token> getIndentationLines(
 
 
 @Composable
-fun BoxScope.IndentationLines(
+public fun BoxScope.IndentationLines(
     indentationLines: List<SourceCodePosition>,
     modifier: Modifier,
     width: Dp = 1.dp,
@@ -62,7 +62,7 @@ fun BoxScope.IndentationLines(
         val bottom = letterHeight * realLine.inc()
         val end = letterWidth * column
         with(LocalDensity.current) {
-            Box(Modifier.size(end.toDp() + width / 2, bottom.toDp()), Alignment.BottomEnd) {
+            Box(Modifier.size(end.toDp() + width, bottom.toDp()), Alignment.BottomEnd) {
                 Spacer(
                     modifier = modifier
                         .width(width)
@@ -73,7 +73,8 @@ fun BoxScope.IndentationLines(
     }
 }
 
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
+@PublishedApi
+internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
     line: Int,
     state: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
@@ -89,7 +90,7 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
             val lastRemoved = mutableSetOf<Bracket>()
             while (tokenIndex < state.tokens.size) {
                 val token = state.tokens[tokenIndex]
-                if ((state.tokenPositions[token] ?: continue).second.line >= topLine) break
+                if ((state.tokenPositions[token] ?: continue).second.line >= topLine + 1) break
                 if (token is Bracket) {
                     val (start, end) = state.tokenPositions[token] ?: continue
                     when (token.scopeChange) {
@@ -128,7 +129,7 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
     }.sorted().toSet()
 }
 
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetForLineToAppearOnTop(
+public inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetForLineToAppearOnTop(
     line: Int,
     textSize: Size,
     density: Density,
@@ -155,7 +156,8 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetForLineToA
 }
 
 
-inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLinesHeight(
+@PublishedApi
+internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLinesHeight(
     line: Int,
     textSize: Size,
     density: Density,
@@ -173,9 +175,11 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLinesHeigh
 }
 
 @Composable
-inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsScope.PinnedLines(
+public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsScope.PinnedLines(
     state: BasicSourceCodeTextFieldState<T>,
     textStyle: TextStyle,
+    lineNumbersColor: Color,
+    backgroundColor: Color,
     scrollState: ScrollState,
     showLineNumbers: Boolean,
     matchedBrackets: Map<Bracket, Bracket>,
@@ -183,6 +187,7 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsS
     maximumPinnedLinesHeight: Dp = maxHeight / 3,
     crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
+    crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
     crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>) -> Unit = { },
 ) {
     val measuredText = measureText(textStyle)
@@ -190,83 +195,94 @@ inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsS
     val topVisibleRow = (scrollState.value / measuredText.height).toInt()
     val requestedLinesSet = getPinnedLines(topVisibleRow, state, matchedBrackets, pinLinesChooser)
     if (requestedLinesSet.isEmpty()) return
-    Column(Modifier.heightIn(max = maximumPinnedLinesHeight)) {
-        Row(
-            modifier = Modifier
-                .width(this@PinnedLines.maxWidth)
-                .verticalScroll(rememberScrollState())
-                .background(Color.White)
-        ) {
-            val lineCount: Int = state.offsets.size
-            val linesToWrite = requestedLinesSet.associateWith { lineNumber ->
-                val lineOffsets =
-                    state.offsets[lineNumber].takeIf { it.isNotEmpty() } ?: return@associateWith AnnotatedString("")
-                val lastOffset =
-                    if (lineOffsets.last() == state.text.lastIndex) state.text.length else lineOffsets.last()
-                buildAnnotatedString {
-                    append(state.annotatedString, lineOffsets.first(), lastOffset)
-                }
-            }
-            AnimatedVisibility(showLineNumbers) {
-                Column {
-                    for ((lineNumber, _) in linesToWrite) {
-                        Row(modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { onClick(lineNumber) }
-                            )
-                        ) {
-                            val lineNumbersWidth = with(LocalDensity.current) {
-                                (lineCount.toString().length * measuredText.width).toDp()
-                            }
-                            Box(Modifier.width(lineNumbersWidth)) {
-                                BasicText(
-                                    text = "${lineNumber.inc()}",
-                                    style = textStyle,
-                                    modifier = Modifier.align(Alignment.CenterEnd).height(textHeightDp)
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                        }
+    Column {
+        Column(Modifier.heightIn(max = maximumPinnedLinesHeight)) {
+            Row(
+                modifier = Modifier
+                    .width(this@PinnedLines.maxWidth)
+                    .verticalScroll(rememberScrollState())
+                    .background(backgroundColor)
+            ) {
+                val lineCount: Int = state.offsets.size
+                val linesToWrite = requestedLinesSet.associateWith { lineNumber ->
+                    val lineOffsets =
+                        state.offsets[lineNumber].takeIf { it.isNotEmpty() } ?: return@associateWith AnnotatedString("")
+                    val lastOffset =
+                        if (lineOffsets.last() == state.text.lastIndex) state.text.length else lineOffsets.last()
+                    buildAnnotatedString {
+                        append(state.annotatedString, lineOffsets.first(), lastOffset)
                     }
                 }
-            }
-            BoxWithConstraints {
-                val outerScope = this
-                BoxWithConstraints(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    val innerScope = this
-                    var maxWidth by remember { mutableStateOf(outerScope.maxWidth) }
+                AnimatedVisibility(showLineNumbers) {
                     Column {
-                        for ((lineNumber, annotatedString) in linesToWrite) {
-                            Box(
-                                modifier = Modifier
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = { onClick(lineNumber) }
-                                    )
-                                    .fillMaxWidth()
-                            ) {
-                                BasicText(
-                                    text = annotatedString,
-                                    style = textStyle,
-                                    modifier = Modifier
-                                        .height(textHeightDp)
-                                        .widthIn(min = maxWidth)
-                                        .layout { measurable, constraints ->
-                                            val placeable = measurable.measure(constraints)
-                                            maxWidth = max(maxWidth, placeable.width.toDp())
-
-                                            layout(placeable.width, placeable.height) {
-                                                placeable.placeRelative(0, 0)
-                                            }
-                                        },
+                        for ((lineNumber, _) in linesToWrite) {
+                            Row(modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { onClick(lineNumber) }
                                 )
+                            ) {
+                                val lineNumbersWidth = with(LocalDensity.current) {
+                                    (lineCount.toString().length * measuredText.width).toDp()
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                Box(Modifier.width(lineNumbersWidth)) {
+                                    BasicText(
+                                        text = "${lineNumber.inc()}",
+                                        style = textStyle.copy(color = lineNumbersColor),
+                                        modifier = Modifier.align(Alignment.CenterEnd).height(textHeightDp)
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
                             }
                         }
                     }
-                    innerScope.additionalInnerComposable(linesToWrite)
+                }
+                BoxWithConstraints {
+                    val outerScope = this
+                    BoxWithConstraints(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                        val innerScope = this
+                        var maxWidth by remember { mutableStateOf(outerScope.maxWidth) }
+                        Column {
+                            for ((lineNumber, annotatedString) in linesToWrite) {
+                                Box(
+                                    modifier = Modifier
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = { onClick(lineNumber) }
+                                        )
+                                        .fillMaxWidth()
+                                ) {
+                                    BasicText(
+                                        text = annotatedString,
+                                        style = textStyle,
+                                        modifier = Modifier
+                                            .height(textHeightDp)
+                                            .widthIn(min = maxWidth)
+                                            .layout { measurable, constraints ->
+                                                val placeable = measurable.measure(constraints)
+                                                maxWidth = max(maxWidth, placeable.width.toDp())
+
+                                                layout(placeable.width, placeable.height) {
+                                                    placeable.placeRelative(0, 0)
+                                                }
+                                            }
+                                            .onPointerOffsetChange {
+
+                                                val sourceCodePosition = SourceCodePosition(
+                                                    line = lineNumber,
+                                                    column = (it.x / measuredText.width).toInt()
+                                                )
+                                                onHoveredSourceCodePositionChange(sourceCodePosition)
+                                            },
+                                    )
+                                }
+                            }
+                        }
+                        innerScope.additionalInnerComposable(linesToWrite)
+                    }
                 }
             }
         }

@@ -6,13 +6,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.CoroutineScope
 
-actual fun Modifier.scrollOnPress(
+internal actual fun Modifier.scrollOnPress(
     coroutineScope: CoroutineScope,
     verticalScrollState: ScrollState,
     horizontalScrollState: ScrollState
 ): Modifier = this
 
 @Composable
-actual fun Modifier.tooltip(
+@PublishedApi
+internal actual fun Modifier.onPointerOffsetChange(
     onOffsetChange: (IntOffset) -> Unit
 ): Modifier = this

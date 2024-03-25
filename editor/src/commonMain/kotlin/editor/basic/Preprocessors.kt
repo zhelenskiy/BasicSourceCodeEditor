@@ -4,7 +4,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
 
-fun replaceTabs(textFieldValue: TextFieldValue, spaces: Int = 4): TextFieldValue {
+public fun replaceTabs(textFieldValue: TextFieldValue, spaces: Int = 4): TextFieldValue {
     var selectionStartOffset = 0
     var selectionEndOffset = 0
     var compositionStartOffset = 0

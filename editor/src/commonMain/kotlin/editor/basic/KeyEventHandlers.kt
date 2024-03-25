@@ -4,13 +4,14 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
-fun <T : Token> handleMovingOffsets(
+public fun <T : Token> handleMovingOffsets(
     state: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4)
 ): KeyEventHandler = f@{ keyEvent: KeyEvent ->
     if (
-        state.selection.collapsed || keyEvent.key != Key.Tab || keyEvent.type != KeyEventType.KeyDown ||
-        keyEvent.isAltPressed || keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+        state.selection.collapsed && !keyEvent.isShiftPressed || keyEvent.key != Key.Tab ||
+        keyEvent.type != KeyEventType.KeyDown || keyEvent.isAltPressed || keyEvent.isCtrlPressed ||
+        keyEvent.isMetaPressed
     ) return@f null
     val selectionLines =
         state.sourceCodePositions[state.selection.min].line..state.sourceCodePositions[state.selection.max].line
