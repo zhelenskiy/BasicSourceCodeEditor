@@ -1,22 +1,49 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop.
+# SourceTextField
 
-* `/composeApp` is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - `commonMain` is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    `iosMain` would be the right folder for such calls.
+This project is a highly-extendable version of token-based Compose Multiplatform source code editor and helper functions.
+It consists of 2 modules:
+* `editor` is the main library module providing the artifacts.
+* `composeApp` is an example app supporting a simple language based on regular bracket sequences.
 
-* `/iosApp` contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform, 
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+  It targets Android, Desktop, iOS, WasmJS (experimental).
 
+The editor does not implement additional functionality itself but provides extension points,
+making the extension space not limited to the existing helper functions.
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+### Features
+If you use existing helper functions you add support for:
+* String preprocessors (such as replacing tabs with spaces)
+* Token-based highlighting
+* Automatic adding closing brackets (or other chars), indenting selected content
+* Automatic indenting closing bracket (or other chars)
+* Reusing closing bracket (or other chars)
+* Automatic indentation
+* Automatic removing several spaces at once during dedent
+* Automatic removing closing bracket (or other chars) on deleting preceding opening bracket (or other chars)
+* Showing indentation
+* Sticky header
+* Tab and Shift+Tab support for indentation
+* Highlighting matching brackets
+* Highlighting current matching brackets
+* Highlighting same symbols
 
-**Note:** Compose/Web is Experimental and may be changed at any time. Use it only for evaluation purposes.
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [GitHub](https://github.com/JetBrains/compose-multiplatform/issues).
+### Usage
 
-You can open the web application by running the `:composeApp:wasmJsBrowserDevelopmentRun` Gradle task.
+The main entry point is
+```kotlin
+@Composable
+fun <T : Token> BasicSourceCodeTextField(
+    ...
+)
+```
+which takes many parameters and extensions for extension points.
+It is expected that users will provide all necessary extensions and wrap the function in something more convenient for end users.
+
+See `CorrectBracketSequence` as an example.
+
+### Drawbacks
+As the editor is a pet project, it does not aim to replace full-fledged code editors, used in the modern IDEs as developing such would require a giant amount of time and work to do from scratch.
+So, regular `BasicTextField` is used inside which does not support incremental changes and does not support lazy rendering.
+* This leads to lagging on giant code sources (thousands of lines).
+* Also, using `TextLayoutResult` API is impossible as I have to call too many times and it is rather expensive.
+So, I have to rely on the fact that text is monospace (which is generally true for code) but breaks on R2L code and some chars that don't take place. Nevertheless, both these cases are quite uncommon for code.
