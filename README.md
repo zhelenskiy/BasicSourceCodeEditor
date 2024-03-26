@@ -41,9 +41,11 @@ It is expected that users will provide all necessary extensions and wrap the fun
 
 See `CorrectBracketSequence` as an example.
 
+<img src="readmeData/screenshot.png" height="50%">!
+
 ### Drawbacks
 As the editor is a pet project, it does not aim to replace full-fledged code editors, used in the modern IDEs as developing such would require a giant amount of time and work to do from scratch.
 So, regular `BasicTextField` is used inside which does not support incremental changes and does not support lazy rendering.
 * This leads to lagging on giant code sources (thousands of lines).
 * Also, using `TextLayoutResult` API is impossible as I have to call too many times and it is rather expensive.
-So, I have to rely on the fact that text is monospace (which is generally true for code) but breaks on R2L code and some chars that don't take place. Nevertheless, both these cases are quite uncommon for code.
+So, I have to rely on the fact that text is monospace (which is generally true for code) but breaks on R2L layout and some chars that don't take place. Nevertheless, both these cases are quite uncommon for code.

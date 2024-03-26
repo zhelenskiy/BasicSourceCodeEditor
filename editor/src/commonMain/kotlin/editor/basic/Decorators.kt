@@ -192,6 +192,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
 ) {
     val measuredText = measureText(textStyle)
     val textHeightDp = with(LocalDensity.current) { measuredText.height.toDp() }
+    if (scrollState.value == 0) return
     val topVisibleRow = (scrollState.value / measuredText.height).toInt()
     val requestedLinesSet = getPinnedLines(topVisibleRow, state, matchedBrackets, pinLinesChooser)
     if (requestedLinesSet.isEmpty()) return
