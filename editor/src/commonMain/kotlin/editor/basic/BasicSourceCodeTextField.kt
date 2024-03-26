@@ -6,15 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -272,6 +264,8 @@ private fun <T : Token> translate(
     return tokenize(handledAsCharEvent)
 }
 
+public val defaultLineNumberModifier: Modifier = Modifier.padding(start = 4.dp, end = 8.dp)
+
 @Composable
 public fun <T : Token> BasicSourceCodeTextField(
     state: BasicSourceCodeTextFieldState<T>,
@@ -290,6 +284,7 @@ public fun <T : Token> BasicSourceCodeTextField(
     verticalScrollState: ScrollState = rememberScrollState(),
     modifier: Modifier = Modifier,
     basicTextFieldModifier: Modifier = Modifier,
+    lineNumberModifier: Modifier = defaultLineNumberModifier,
     editorOffsetsForPosition: (sourceCodePosition: SourceCodePosition) -> EditorOffsets = { EditorOffsets() },
     manualScrollToPosition: SharedFlow<SourceCodePosition> = remember { MutableSharedFlow() },
     charEventHandler: CharEventHandler = { null },
@@ -310,18 +305,14 @@ public fun <T : Token> BasicSourceCodeTextField(
 
         Row(modifier = Modifier.verticalScroll(verticalScrollState).widthIn(minWidth)) {
             AnimatedVisibility(showLineNumbers) {
-                Row {
-                    Spacer(Modifier.width(4.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        repeat(state.offsets.size) {
-                            BasicText(
-                                text = "${it + 1}",
-                                style = textStyle.copy(color = lineNumbersColor),
-                                modifier = Modifier.height(textHeightDp),
-                            )
-                        }
+                Column(horizontalAlignment = Alignment.End) {
+                    repeat(state.offsets.size) {
+                        BasicText(
+                            text = "${it + 1}",
+                            style = textStyle.copy(color = lineNumbersColor),
+                            modifier = lineNumberModifier.height(textHeightDp),
+                        )
                     }
-                    Spacer(Modifier.width(8.dp))
                 }
             }
 

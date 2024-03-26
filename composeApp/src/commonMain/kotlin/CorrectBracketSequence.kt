@@ -3,6 +3,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.*
@@ -150,6 +151,7 @@ fun CorrectBracketSequence() {
                     pinLinesChooser = pinLinesChooser,
                     maximumPinnedLinesHeight = (maxHeight / 3).also { maximumPinnedLinesHeight = it },
                     onClick = { coroutineScope.launch { externalScrollToFlow.emit(SourceCodePosition(it, 0)) } },
+                    divider = { HorizontalDivider(thickness = 1.dp) },
                     additionalInnerComposable = { linesToWrite ->
                         AnimatedVisibility(showIndentation) {
                             val lineMapping = linesToWrite.keys.withIndex().associate { (index, line) -> line to index }

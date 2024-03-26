@@ -5,7 +5,6 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material3.Divider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -183,8 +183,10 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     scrollState: ScrollState,
     showLineNumbers: Boolean,
     matchedBrackets: Map<Bracket, Bracket>,
-    dividerThickness: Dp = 1.dp,
+    divider: @Composable () -> Unit,
     maximumPinnedLinesHeight: Dp = maxHeight / 3,
+    lineNumberModifier: Modifier = defaultLineNumberModifier,
+    lineStringModifier: Modifier = Modifier,
     crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
     crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
@@ -217,7 +219,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                 AnimatedVisibility(showLineNumbers) {
                     Column {
                         for ((lineNumber, _) in linesToWrite) {
-                            Row(modifier = Modifier
+                            Box(modifier = Modifier
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
@@ -227,15 +229,13 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                                 val lineNumbersWidth = with(LocalDensity.current) {
                                     (lineCount.toString().length * measuredText.width).toDp()
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                Box(Modifier.width(lineNumbersWidth)) {
-                                    BasicText(
-                                        text = "${lineNumber.inc()}",
-                                        style = textStyle.copy(color = lineNumbersColor),
-                                        modifier = Modifier.align(Alignment.CenterEnd).height(textHeightDp)
-                                    )
-                                }
-                                Spacer(Modifier.width(8.dp))
+                                BasicText(
+                                    text = "${lineNumber.inc()}",
+                                    style = textStyle.copy(color = lineNumbersColor, textAlign = TextAlign.End),
+                                    modifier = lineNumberModifier
+                                        .width(lineNumbersWidth)
+                                        .height(textHeightDp)
+                                )
                             }
                         }
                     }
@@ -259,7 +259,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                                     BasicText(
                                         text = annotatedString,
                                         style = textStyle,
-                                        modifier = Modifier
+                                        modifier = lineStringModifier
                                             .height(textHeightDp)
                                             .widthIn(min = maxWidth)
                                             .layout { measurable, constraints ->
@@ -271,7 +271,6 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                                                 }
                                             }
                                             .onPointerOffsetChange {
-
                                                 val sourceCodePosition = SourceCodePosition(
                                                     line = lineNumber,
                                                     column = (it.x / measuredText.width).toInt()
@@ -287,6 +286,6 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                 }
             }
         }
-        Divider(thickness = dividerThickness)
+        divider()
     }
 }
