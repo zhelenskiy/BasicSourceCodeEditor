@@ -267,13 +267,27 @@ private fun <T : Token> translate(
 public val defaultLineNumberModifier: Modifier = Modifier.padding(start = 4.dp, end = 8.dp)
 
 @Composable
+@PublishedApi
+internal fun Wrapper(content: @Composable (@Composable () -> Unit) -> Unit, inner: @Composable () -> Unit) {
+    var called = false
+    content {
+        inner()
+        require(!called) { "Cannot call inner more than once!" }
+        called = true
+    }
+    if (!called) {
+        inner()
+    }
+}
+
+@Composable
 public fun <T : Token> BasicSourceCodeTextField(
     state: BasicSourceCodeTextFieldState<T>,
     onStateUpdate: (new: BasicSourceCodeTextFieldState<T>) -> Unit,
     preprocessors: List<Preprocessor> = emptyList(),
     tokenize: Tokenizer<T>,
-    additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
-    additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?) -> Unit) = { _ -> },
+    additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable () -> Unit) -> Unit) = { _, _ -> },
+    additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable () -> Unit) -> Unit) = { _, _ -> },
     textStyle: TextStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace),
     cursorBrush: Brush = SolidColor(Color.Black),
     showLineNumbers: Boolean = true,
@@ -303,176 +317,185 @@ public fun <T : Token> BasicSourceCodeTextField(
         val editorOuterMinHeight = minHeight
         val editorOuterHeightPx = with(LocalDensity.current) { editorOuterHeight.toPx() }
 
-        Row(modifier = Modifier.verticalScroll(verticalScrollState).widthIn(minWidth)) {
-            AnimatedVisibility(showLineNumbers) {
-                Column(horizontalAlignment = Alignment.End) {
-                    repeat(state.offsets.size) {
-                        BasicText(
-                            text = "${it + 1}",
-                            style = textStyle.copy(color = lineNumbersColor),
-                            modifier = lineNumberModifier.height(textHeightDp),
+        Wrapper(
+            content = { innerComposable ->
+                additionalOuterComposable(textLayout, innerComposable)
+            }
+        ) {
+            Row(modifier = Modifier.verticalScroll(verticalScrollState).widthIn(minWidth)) {
+                AnimatedVisibility(showLineNumbers) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        repeat(state.offsets.size) {
+                            BasicText(
+                                text = "${it + 1}",
+                                style = textStyle.copy(color = lineNumbersColor),
+                                modifier = lineNumberModifier.height(textHeightDp),
+                            )
+                        }
+                    }
+                }
+
+
+                BoxWithConstraints(modifier = Modifier.weight(1f)) {
+                    val editorOuterWidth = minWidth
+                    val editorOuterWidthPx = with(LocalDensity.current) { editorOuterWidth.toPx() }
+
+                    fun isCursorVisibleShortcut(): Boolean {
+                        val position = state.sourceCodePositions[state.selection.end]
+                        return isCursorVisible(
+                            textSize = textSize,
+                            position = position,
+                            verticalScrollState = verticalScrollState,
+                            horizontalScrollState = horizontalScrollState,
+                            offsets = editorOffsetsForPosition(position),
+                            editorHeightPx = editorOuterHeightPx,
+                            editorWidthPx = editorOuterWidthPx,
                         )
                     }
-                }
-            }
 
-
-            BoxWithConstraints(modifier = Modifier.weight(1f)) {
-                val editorOuterWidth = minWidth
-                val editorOuterWidthPx = with(LocalDensity.current) { editorOuterWidth.toPx() }
-
-                fun isCursorVisibleShortcut(): Boolean {
-                    val position = state.sourceCodePositions[state.selection.end]
-                    return isCursorVisible(
-                        textSize = textSize,
-                        position = position,
-                        verticalScrollState = verticalScrollState,
-                        horizontalScrollState = horizontalScrollState,
-                        offsets = editorOffsetsForPosition(position),
-                        editorHeightPx = editorOuterHeightPx,
-                        editorWidthPx = editorOuterWidthPx,
-                    )
-                }
-
-                var shouldCursorBeVisible by remember { mutableStateOf(isCursorVisibleShortcut()) }
-                if (horizontalScrollState.isScrollInProgress || verticalScrollState.isScrollInProgress) {
-                    DisposableEffect(Unit) {
-                        onDispose {
-                            shouldCursorBeVisible = isCursorVisibleShortcut()
-                        }
-                    }
-                }
-                LaunchedEffect(state.text, state.selection, state.composition, textSize) {
-                    if (shouldCursorBeVisible) { // when size changes, presence of cursor on the screen should be preserved
-                        coroutineScope.launch {
-                            val position = state.sourceCodePositions[state.selection.end]
-                            scrollTo(
-                                textSize = textSize,
-                                position = position,
-                                horizontalScrollState = horizontalScrollState,
-                                verticalScrollState = verticalScrollState,
-                                outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
-                                outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
-                                offsets = editorOffsetsForPosition(position),
-                                horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
-                                verticalThresholdEdgeLines = verticalThresholdEdgeLines,
-                            )
-                        }
-                    }
-                }
-                LaunchedEffect(editorOuterHeightPx, editorOuterWidthPx) {
-                    if (shouldCursorBeVisible) { // when size changes, presence of cursor on the screen should be preserved
-                        coroutineScope.launch {
-                            val position = state.sourceCodePositions[state.selection.end]
-                            scrollTo(
-                                textSize = textSize,
-                                position = position,
-                                horizontalScrollState = horizontalScrollState,
-                                verticalScrollState = verticalScrollState,
-                                outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
-                                outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
-                                animationSpec = SpringSpec(stiffness = Spring.StiffnessHigh),
-                                offsets = editorOffsetsForPosition(position),
-                                horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
-                                verticalThresholdEdgeLines = verticalThresholdEdgeLines,
-                            )
-                        }
-                    }
-                }
-                LaunchedEffect(
-                    editorOuterHeightPx,
-                    editorOuterWidthPx,
-                    state.text,
-                    state.selection,
-                    state.composition,
-                    textSize
-                ) {
-                    manualScrollToPosition.collect {
-                        coroutineScope.launch {
-                            scrollTo(
-                                textSize = textSize,
-                                position = it,
-                                horizontalScrollState = horizontalScrollState,
-                                verticalScrollState = verticalScrollState,
-                                outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
-                                outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
-                                offsets = editorOffsetsForPosition(it),
-                                horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
-                                verticalThresholdEdgeLines = verticalThresholdEdgeLines,
-                            )
-                        }
-                    }
-                }
-
-                BoxWithConstraints(
-                    modifier = Modifier.horizontalScroll(horizontalScrollState)
-                ) {
-                    val innerSizes = this
-                    var textFieldSize: IntSize? by remember { mutableStateOf(null) }
-
-                    fun translate(textFieldState: TextFieldValue) = translate(
-                        textFieldState, preprocessors, tokenize, state, charEventHandler
-                    )
-
-                    fun onValueChange(newTextFieldState: TextFieldValue) {
-                        onStateUpdate(translate(newTextFieldState))
-                        shouldCursorBeVisible = true
-                    }
-
-                    coroutineScope.launch {
-                        externalTextFieldChanges.collectLatest {
-                            onValueChange(it)
-                        }
-                    }
-
-                    BasicTextField(
-                        value = TextFieldValue(
-                            annotatedString = state.annotatedString,
-                            selection = state.selection,
-                            composition = state.composition,
-                        ),
-                        onValueChange = { onValueChange(it) },
-                        maxLines = Int.MAX_VALUE,
-                        textStyle = textStyle,
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrect = false,
-                            keyboardType = KeyboardType.Ascii,
-                        ),
-                        cursorBrush = cursorBrush,
-                        onTextLayout = { textLayout = it },
-                        visualTransformation = visualTransformation,
-                        modifier = basicTextFieldModifier
-                            .heightIn(min = editorOuterMinHeight)
-                            .widthIn(min = editorOuterWidth)
-                            .scrollOnPress(
-                                coroutineScope,
-                                verticalScrollState,
-                                horizontalScrollState
-                            )
-                            .onSizeChanged { textFieldSize = it }
-                            .onPreviewKeyEvent {
-                                when (val eventResult = keyEventHandler(it)) {
-                                    null -> false
-                                    else -> {
-                                        onValueChange(eventResult)
-                                        true
-                                    }
-                                }
+                    var shouldCursorBeVisible by remember { mutableStateOf(isCursorVisibleShortcut()) }
+                    if (horizontalScrollState.isScrollInProgress || verticalScrollState.isScrollInProgress) {
+                        DisposableEffect(Unit) {
+                            onDispose {
+                                shouldCursorBeVisible = isCursorVisibleShortcut()
                             }
-                            .onPointerOffsetChange {
-                                val sourceCodePosition = SourceCodePosition(
-                                    line = (it.y / textSize.height).toInt(),
-                                    column = (it.x / textSize.width).toInt()
+                        }
+                    }
+                    LaunchedEffect(state.text, state.selection, state.composition, textSize) {
+                        if (shouldCursorBeVisible) { // when size changes, presence of cursor on the screen should be preserved
+                            coroutineScope.launch {
+                                val position = state.sourceCodePositions[state.selection.end]
+                                scrollTo(
+                                    textSize = textSize,
+                                    position = position,
+                                    horizontalScrollState = horizontalScrollState,
+                                    verticalScrollState = verticalScrollState,
+                                    outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
+                                    outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
+                                    offsets = editorOffsetsForPosition(position),
+                                    horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
+                                    verticalThresholdEdgeLines = verticalThresholdEdgeLines,
                                 )
-                                onHoveredSourceCodePositionChange(sourceCodePosition)
-                            },
-                    )
-                    innerSizes.additionalInnerComposable(textLayout)
+                            }
+                        }
+                    }
+                    LaunchedEffect(editorOuterHeightPx, editorOuterWidthPx) {
+                        if (shouldCursorBeVisible) { // when size changes, presence of cursor on the screen should be preserved
+                            coroutineScope.launch {
+                                val position = state.sourceCodePositions[state.selection.end]
+                                scrollTo(
+                                    textSize = textSize,
+                                    position = position,
+                                    horizontalScrollState = horizontalScrollState,
+                                    verticalScrollState = verticalScrollState,
+                                    outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
+                                    outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
+                                    animationSpec = SpringSpec(stiffness = Spring.StiffnessHigh),
+                                    offsets = editorOffsetsForPosition(position),
+                                    horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
+                                    verticalThresholdEdgeLines = verticalThresholdEdgeLines,
+                                )
+                            }
+                        }
+                    }
+                    LaunchedEffect(
+                        editorOuterHeightPx,
+                        editorOuterWidthPx,
+                        state.text,
+                        state.selection,
+                        state.composition,
+                        textSize
+                    ) {
+                        manualScrollToPosition.collect {
+                            coroutineScope.launch {
+                                scrollTo(
+                                    textSize = textSize,
+                                    position = it,
+                                    horizontalScrollState = horizontalScrollState,
+                                    verticalScrollState = verticalScrollState,
+                                    outerEditorWidthPx = editorOuterWidthPx.roundToInt(),
+                                    outerEditorHeightPx = editorOuterHeightPx.roundToInt(),
+                                    offsets = editorOffsetsForPosition(it),
+                                    horizontalThresholdEdgeChars = horizontalThresholdEdgeChars,
+                                    verticalThresholdEdgeLines = verticalThresholdEdgeLines,
+                                )
+                            }
+                        }
+                    }
+
+                    BoxWithConstraints(
+                        modifier = Modifier.horizontalScroll(horizontalScrollState)
+                    ) {
+                        val innerSizes = this
+                        var textFieldSize: IntSize? by remember { mutableStateOf(null) }
+
+                        fun translate(textFieldState: TextFieldValue) = translate(
+                            textFieldState, preprocessors, tokenize, state, charEventHandler
+                        )
+
+                        fun onValueChange(newTextFieldState: TextFieldValue) {
+                            onStateUpdate(translate(newTextFieldState))
+                            shouldCursorBeVisible = true
+                        }
+
+                        coroutineScope.launch {
+                            externalTextFieldChanges.collectLatest {
+                                onValueChange(it)
+                            }
+                        }
+                        Wrapper(
+                            content = { innerComposable ->
+                                innerSizes.additionalInnerComposable(textLayout, innerComposable)
+                            }
+                        ) {
+                            BasicTextField(
+                                value = TextFieldValue(
+                                    annotatedString = state.annotatedString,
+                                    selection = state.selection,
+                                    composition = state.composition,
+                                ),
+                                onValueChange = { onValueChange(it) },
+                                maxLines = Int.MAX_VALUE,
+                                textStyle = textStyle,
+                                keyboardOptions = KeyboardOptions.Default.copy(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrect = false,
+                                    keyboardType = KeyboardType.Ascii,
+                                ),
+                                cursorBrush = cursorBrush,
+                                onTextLayout = { textLayout = it },
+                                visualTransformation = visualTransformation,
+                                modifier = basicTextFieldModifier
+                                    .heightIn(min = editorOuterMinHeight)
+                                    .widthIn(min = editorOuterWidth)
+                                    .scrollOnPress(
+                                        coroutineScope,
+                                        verticalScrollState,
+                                        horizontalScrollState
+                                    )
+                                    .onSizeChanged { textFieldSize = it }
+                                    .onPreviewKeyEvent {
+                                        when (val eventResult = keyEventHandler(it)) {
+                                            null -> false
+                                            else -> {
+                                                onValueChange(eventResult)
+                                                true
+                                            }
+                                        }
+                                    }
+                                    .onPointerOffsetChange {
+                                        val sourceCodePosition = SourceCodePosition(
+                                            line = (it.y / textSize.height).toInt(),
+                                            column = (it.x / textSize.width).toInt()
+                                        )
+                                        onHoveredSourceCodePositionChange(sourceCodePosition)
+                                    },
+                            )
+                        }
+                    }
                 }
             }
         }
-        additionalOuterComposable(textLayout)
     }
 }
 

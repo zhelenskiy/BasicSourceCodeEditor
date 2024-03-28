@@ -190,7 +190,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
     crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
-    crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>) -> Unit = { },
+    crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>, inner: @Composable () -> Unit) -> Unit = { _, _ -> },
 ) {
     val measuredText = measureText(textStyle)
     val textHeightDp = with(LocalDensity.current) { measuredText.height.toDp() }
@@ -245,43 +245,48 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                     BoxWithConstraints(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                         val innerScope = this
                         var maxWidth by remember { mutableStateOf(outerScope.maxWidth) }
-                        Column {
-                            for ((lineNumber, annotatedString) in linesToWrite) {
-                                Box(
-                                    modifier = Modifier
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = { onClick(lineNumber) }
-                                        )
-                                        .fillMaxWidth()
-                                ) {
-                                    BasicText(
-                                        text = annotatedString,
-                                        style = textStyle,
-                                        modifier = lineStringModifier
-                                            .height(textHeightDp)
-                                            .widthIn(min = maxWidth)
-                                            .layout { measurable, constraints ->
-                                                val placeable = measurable.measure(constraints)
-                                                maxWidth = max(maxWidth, placeable.width.toDp())
+                        Wrapper(
+                            content = { innerComposable ->
+                                innerScope.additionalInnerComposable(linesToWrite, innerComposable)
+                            }
+                        ) {
+                            Column {
+                                for ((lineNumber, annotatedString) in linesToWrite) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = { onClick(lineNumber) }
+                                            )
+                                            .fillMaxWidth()
+                                    ) {
+                                        BasicText(
+                                            text = annotatedString,
+                                            style = textStyle,
+                                            modifier = lineStringModifier
+                                                .height(textHeightDp)
+                                                .widthIn(min = maxWidth)
+                                                .layout { measurable, constraints ->
+                                                    val placeable = measurable.measure(constraints)
+                                                    maxWidth = max(maxWidth, placeable.width.toDp())
 
-                                                layout(placeable.width, placeable.height) {
-                                                    placeable.placeRelative(0, 0)
+                                                    layout(placeable.width, placeable.height) {
+                                                        placeable.placeRelative(0, 0)
+                                                    }
                                                 }
-                                            }
-                                            .onPointerOffsetChange {
-                                                val sourceCodePosition = SourceCodePosition(
-                                                    line = lineNumber,
-                                                    column = (it.x / measuredText.width).toInt()
-                                                )
-                                                onHoveredSourceCodePositionChange(sourceCodePosition)
-                                            },
-                                    )
+                                                .onPointerOffsetChange {
+                                                    val sourceCodePosition = SourceCodePosition(
+                                                        line = lineNumber,
+                                                        column = (it.x / measuredText.width).toInt()
+                                                    )
+                                                    onHoveredSourceCodePositionChange(sourceCodePosition)
+                                                },
+                                        )
+                                    }
                                 }
                             }
                         }
-                        innerScope.additionalInnerComposable(linesToWrite)
                     }
                 }
             }

@@ -127,7 +127,7 @@ fun CorrectBracketSequence() {
         onStateUpdate = { codeTextFieldState = it },
         preprocessors = listOf({ replaceTabs(it) }),
         tokenize = { tokenizationPipeline(it) },
-        additionalInnerComposable = {
+        additionalInnerComposable = { _, _ ->
             AnimatedVisibility(showIndentation) {
                 IndentationLines(
                     indentationLines = indentationLines,
@@ -138,7 +138,8 @@ fun CorrectBracketSequence() {
         },
         lineNumbersColor = lineNumbersColor,
         manualScrollToPosition = externalScrollToFlow,
-        additionalOuterComposable = {
+        additionalOuterComposable = { _, inner ->
+            inner()
             AnimatedVisibility(pinLines) {
                 PinnedLines(
                     state = codeTextFieldState,
@@ -152,7 +153,7 @@ fun CorrectBracketSequence() {
                     maximumPinnedLinesHeight = (maxHeight / 3).also { maximumPinnedLinesHeight = it },
                     onClick = { coroutineScope.launch { externalScrollToFlow.emit(SourceCodePosition(it, 0)) } },
                     divider = { HorizontalDivider(thickness = 1.dp) },
-                    additionalInnerComposable = { linesToWrite ->
+                    additionalInnerComposable = { linesToWrite, _ ->
                         AnimatedVisibility(showIndentation) {
                             val lineMapping = linesToWrite.keys.withIndex().associate { (index, line) -> line to index }
                             IndentationLines(
