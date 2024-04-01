@@ -150,6 +150,7 @@ public fun combineKeyEventHandlers(vararg handlers: KeyEventHandler?): KeyEventH
     { event -> handlers.firstNotNullOfOrNull { it?.invoke(event) } }
 
 public sealed class CharEvent {
+    public data object NonTextEvent : CharEvent()
     public data class Insert(val char: Char) : CharEvent()
     public data object Backspace : CharEvent()
     public data object Misc : CharEvent()
@@ -253,7 +254,7 @@ private fun <T : Token> translate(
     val preprocessed =
         preprocessors.fold(textFieldState) { acc, preprocessor -> preprocessor(acc) }
     val charEvent = when {
-        state.text == textFieldState.text -> CharEvent.Misc
+        state.text == textFieldState.text -> CharEvent.NonTextEvent
         isBackSpace(state, textFieldState) -> CharEvent.Backspace
         isCharInserted(state, textFieldState) ->
             CharEvent.Insert(char = textFieldState.text[textFieldState.selection.start - 1])
@@ -271,9 +272,9 @@ public val defaultLineNumberModifier: Modifier = Modifier.padding(start = 4.dp, 
 internal fun Wrapper(content: @Composable (@Composable () -> Unit) -> Unit, inner: @Composable () -> Unit) {
     var called = false
     content {
-        inner()
         require(!called) { "Cannot call inner more than once!" }
         called = true
+        inner()
     }
     if (!called) {
         inner()
@@ -379,7 +380,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                             }
                         }
                     }
-                    LaunchedEffect(editorOuterHeightPx, editorOuterWidthPx) {
+                    LaunchedEffect(editorOuterHeightPx, editorOuterWidthPx, textSize) {
                         if (shouldCursorBeVisible) { // when size changes, presence of cursor on the screen should be preserved
                             coroutineScope.launch {
                                 val position = state.sourceCodePositions[state.selection.end]

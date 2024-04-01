@@ -88,10 +88,9 @@ public fun <T : Token> openingBracketCharEventHandler(
         appendRange(textFieldState.text, oldSelection.max, textFieldState.text.length)
     }
     val newSelection = TextRange(newSelectionStart, newSelectionEnd)
-    val newComposition = if (newCompositionStart != null && newCompositionEnd != null) TextRange(
-        newCompositionStart!!,
-        newCompositionEnd!!
-    ) else null
+    val newComposition =
+        if (newCompositionStart == null || newCompositionEnd == null) null
+        else TextRange(newCompositionStart!!, newCompositionEnd!!)
     TextFieldValue(newString, newSelection, newComposition)
 }
 
@@ -222,10 +221,7 @@ public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newL
         text = newText,
         selection = textFieldState.selection.let { TextRange(remapOldOffset(it.start), remapOldOffset(it.end)) },
         composition = textFieldState.composition?.let {
-            TextRange(
-                remapOldOffset(it.start),
-                remapOldOffset(it.end)
-            )
+            TextRange(remapOldOffset(it.start), remapOldOffset(it.end))
         }
     )
 }
