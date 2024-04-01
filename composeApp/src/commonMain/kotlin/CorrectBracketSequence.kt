@@ -255,25 +255,25 @@ fun CorrectBracketSequence() {
                 textFieldState = codeTextFieldState,
                 matchedBrackets = matchedBrackets,
             ),
-            removeIndentBackPressCharEventHandler(
+            removeIndentBackspaceCharEventHandler(
                 textFieldState = codeTextFieldState,
             ),
-            removeEmptyBracesBackPressCharEventHandler(
+            removeEmptyBracesBackspaceCharEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "[",
                 closingBracket = "]",
             ),
-            removeEmptyBracesBackPressCharEventHandler(
+            removeEmptyBracesBackspaceCharEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "(",
                 closingBracket = ")",
             ),
-            removeEmptyBracesBackPressCharEventHandler(
+            removeEmptyBracesBackspaceCharEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "<",
                 closingBracket = ">",
             ),
-            removeEmptyBracesBackPressCharEventHandler(
+            removeEmptyBracesBackspaceCharEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "{",
                 closingBracket = "}",

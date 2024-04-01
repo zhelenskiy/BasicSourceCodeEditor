@@ -226,7 +226,7 @@ public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newL
     )
 }
 
-public fun <T : Token> removeIndentBackPressCharEventHandler(
+public fun <T : Token> removeIndentBackspaceCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4),
 ): CharEventHandler = f@{ keyEvent ->
@@ -252,7 +252,7 @@ public fun <T : Token> removeIndentBackPressCharEventHandler(
     )
 }
 
-public fun <T : Token> removeEmptyBracesBackPressCharEventHandler(
+public fun <T : Token> removeEmptyBracesBackspaceCharEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     openingBracket: String,
     closingBracket: String,

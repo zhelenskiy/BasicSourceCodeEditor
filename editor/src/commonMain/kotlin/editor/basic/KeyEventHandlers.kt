@@ -6,13 +6,19 @@ import androidx.compose.ui.text.input.TextFieldValue
 
 public fun <T : Token> handleMovingOffsets(
     state: BasicSourceCodeTextFieldState<T>,
-    indent: String = " ".repeat(4)
+    indent: String = " ".repeat(4),
+    moveForwardFilter: KeyEventFilter = { keyEvent ->
+        !keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
+                !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
+    },
+    moveBackwardFilter: KeyEventFilter = { keyEvent ->
+        keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
+                !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
+    },
 ): KeyEventHandler = f@{ keyEvent: KeyEvent ->
-    if (
-        state.selection.collapsed && !keyEvent.isShiftPressed || keyEvent.key != Key.Tab ||
-        keyEvent.type != KeyEventType.KeyDown || keyEvent.isAltPressed || keyEvent.isCtrlPressed ||
-        keyEvent.isMetaPressed
-    ) return@f null
+    val moveForward = !state.selection.collapsed && moveForwardFilter(keyEvent)
+    val moveBackward = moveBackwardFilter(keyEvent)
+    if (moveBackward == moveForward) return@f null
     val selectionLines =
         state.sourceCodePositions[state.selection.min].line..state.sourceCodePositions[state.selection.max].line
     val offsetBefore = state.offsets.getOrNull(selectionLines.first - 1)?.last()
@@ -21,7 +27,7 @@ public fun <T : Token> handleMovingOffsets(
     var newSelectionEnd = state.selection.end
     var newCompositionStart = state.composition?.start
     var newCompositionEnd = state.composition?.end
-    if (keyEvent.isShiftPressed) {
+    if (moveBackward) {
         fun increment(length: Int, oldOffsetStart: Int) {
             if (state.selection.start >= oldOffsetStart)
                 newSelectionStart -= minOf(length, state.selection.start - oldOffsetStart)
@@ -31,7 +37,8 @@ public fun <T : Token> handleMovingOffsets(
 
             if (state.composition != null) {
                 if (state.composition.start >= oldOffsetStart)
-                    newCompositionStart = newCompositionStart!! - minOf(length, state.composition.start - oldOffsetStart)
+                    newCompositionStart =
+                        newCompositionStart!! - minOf(length, state.composition.start - oldOffsetStart)
 
                 if (state.composition.end >= oldOffsetStart)
                     newCompositionEnd = newCompositionEnd!! - minOf(length, state.composition.end - oldOffsetStart)

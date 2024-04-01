@@ -145,6 +145,7 @@ public fun combineCharEventHandlers(vararg handlers: CharEventHandler?): CharEve
     { event -> handlers.firstNotNullOfOrNull { it?.invoke(event) } }
 
 public typealias KeyEventHandler = (KeyEvent) -> TextFieldValue?
+public typealias KeyEventFilter = (KeyEvent) -> Boolean
 
 public fun combineKeyEventHandlers(vararg handlers: KeyEventHandler?): KeyEventHandler =
     { event -> handlers.firstNotNullOfOrNull { it?.invoke(event) } }
