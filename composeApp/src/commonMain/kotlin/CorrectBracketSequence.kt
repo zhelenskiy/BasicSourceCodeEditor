@@ -112,14 +112,14 @@ fun CorrectBracketSequence() {
     val coroutineScope = rememberCoroutineScope()
     val externalScrollToFlow = remember { MutableSharedFlow<SourceCodePosition>() }
     val showLineNumbers by remember { mutableStateOf(true) }
-    val pinLines by remember { mutableStateOf(true) }
+    val stickyHeader by remember { mutableStateOf(true) }
     val showIndentation by remember { mutableStateOf(true) }
     val textSize = measureText(textStyle)
     val density = LocalDensity.current
-    val pinLinesChooser: (Bracket) -> IntRange? = { bracket ->
+    val stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket ->
         if (bracket.bracket in "{}") codeTextFieldState.tokenLines[bracket] else null
     }
-    var maximumPinnedLinesHeight: Dp by remember { mutableStateOf(0.dp) }
+    var maximumStickyHeaderHeight: Dp by remember { mutableStateOf(0.dp) }
 
     val lineNumbersColor = Color.DarkGray
     BasicSourceCodeTextField(
@@ -140,8 +140,8 @@ fun CorrectBracketSequence() {
         manualScrollToPosition = externalScrollToFlow,
         additionalOuterComposable = { _, inner ->
             inner()
-            AnimatedVisibility(pinLines) {
-                PinnedLines(
+            AnimatedVisibility(stickyHeader) {
+                StickyHeader(
                     state = codeTextFieldState,
                     textStyle = textStyle,
                     lineNumbersColor = lineNumbersColor,
@@ -149,8 +149,8 @@ fun CorrectBracketSequence() {
                     scrollState = verticalState,
                     showLineNumbers = showLineNumbers,
                     matchedBrackets = matchedBrackets,
-                    pinLinesChooser = pinLinesChooser,
-                    maximumPinnedLinesHeight = (maxHeight / 3).also { maximumPinnedLinesHeight = it },
+                    stickyHeaderLinesChooser = stickyHeaderLinesChooser,
+                    maximumStickyHeaderHeight = (maxHeight / 3).also { maximumStickyHeaderHeight = it },
                     onClick = { coroutineScope.launch { externalScrollToFlow.emit(SourceCodePosition(it, 0)) } },
                     divider = { HorizontalDivider(thickness = 1.dp) },
                     additionalInnerComposable = { linesToWrite, _ ->
@@ -180,8 +180,8 @@ fun CorrectBracketSequence() {
                     state = codeTextFieldState,
                     matchedBrackets = matchedBrackets,
                     dividerThickness = 0.dp, // do not include divider thickness in the calculation
-                    maximumPinnedLinesHeight = maximumPinnedLinesHeight,
-                    pinLinesChooser = pinLinesChooser,
+                    maximumStickyHeaderHeight = maximumStickyHeaderHeight,
+                    stickyHeaderLinesChooser = stickyHeaderLinesChooser,
                 )
             )
         },

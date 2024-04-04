@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -74,11 +75,11 @@ public fun BoxScope.IndentationLines(
 }
 
 @PublishedApi
-internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLines(
+internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getStickyHeaderLines(
     line: Int,
     state: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
+    crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
 ): Set<Int> {
     val lineUsages = IntArray(state.offsets.size)
     var topLine = line
@@ -125,7 +126,7 @@ internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedL
         }
     }
     return openedBracketLines.flatMapTo(mutableSetOf()) { bracket ->
-        pinLinesChooser(bracket) ?: IntRange.EMPTY
+        stickyHeaderLinesChooser(bracket) ?: IntRange.EMPTY
     }.sorted().toSet()
 }
 
@@ -136,19 +137,19 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetFor
     state: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     dividerThickness: Dp,
-    maximumPinnedLinesHeight: Dp,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
+    maximumStickyHeaderHeight: Dp,
+    crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
 ): Int {
     val resultLine = (line downTo 0).firstOrNull { attemptLine ->
-        val height = getPinnedLinesHeight(
+        val height = getStickyHeaderHeight(
             attemptLine,
             textSize,
             density,
             state,
             matchedBrackets,
             dividerThickness,
-            maximumPinnedLinesHeight,
-            pinLinesChooser
+            maximumStickyHeaderHeight,
+            stickyHeaderLinesChooser
         )
         (line - attemptLine) * textSize.height >= height
     } ?: 0
@@ -157,25 +158,25 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> getOffsetFor
 
 
 @PublishedApi
-internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getPinnedLinesHeight(
+internal inline fun <reified Bracket : ScopeChangingToken, T : Token> getStickyHeaderHeight(
     line: Int,
     textSize: Size,
     density: Density,
     state: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     dividerThickness: Dp,
-    maximumPinnedLinesHeight: Dp,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
+    maximumStickyHeaderHeight: Dp,
+    crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] }
 ): Int {
-    val pinnedLines = getPinnedLines<Bracket, T>(line, state, matchedBrackets, pinLinesChooser)
-    if (pinnedLines.isEmpty()) return 0
+    val stickyHeaderLines = getStickyHeaderLines<Bracket, T>(line, state, matchedBrackets, stickyHeaderLinesChooser)
+    if (stickyHeaderLines.isEmpty()) return 0
     return with(density) {
-        minOf(pinnedLines.size * textSize.height + dividerThickness.toPx(), maximumPinnedLinesHeight.toPx())
+        minOf(stickyHeaderLines.size * textSize.height + dividerThickness.toPx(), maximumStickyHeaderHeight.toPx())
     }.roundToInt()
 }
 
 @Composable
-public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsScope.PinnedLines(
+public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConstraintsScope.StickyHeader(
     state: BasicSourceCodeTextFieldState<T>,
     textStyle: TextStyle,
     lineNumbersColor: Color,
@@ -184,10 +185,11 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     showLineNumbers: Boolean,
     matchedBrackets: Map<Bracket, Bracket>,
     divider: @Composable () -> Unit,
-    maximumPinnedLinesHeight: Dp = maxHeight / 3,
+    maximumStickyHeaderHeight: Dp = maxHeight / 3,
     lineNumberModifier: Modifier = defaultLineNumberModifier,
     lineStringModifier: Modifier = Modifier,
-    crossinline pinLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
     crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
     crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>, inner: @Composable () -> Unit) -> Unit = { _, _ -> },
@@ -196,13 +198,13 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     val textHeightDp = with(LocalDensity.current) { measuredText.height.toDp() }
     if (scrollState.value == 0) return
     val topVisibleRow = (scrollState.value / measuredText.height).toInt()
-    val requestedLinesSet = getPinnedLines(topVisibleRow, state, matchedBrackets, pinLinesChooser)
+    val requestedLinesSet = getStickyHeaderLines(topVisibleRow, state, matchedBrackets, stickyHeaderLinesChooser)
     if (requestedLinesSet.isEmpty()) return
     Column {
-        Column(Modifier.heightIn(max = maximumPinnedLinesHeight)) {
+        Column(Modifier.heightIn(max = maximumStickyHeaderHeight)) {
             Row(
                 modifier = Modifier
-                    .width(this@PinnedLines.maxWidth)
+                    .width(this@StickyHeader.maxWidth)
                     .verticalScroll(rememberScrollState())
                     .background(backgroundColor)
             ) {
@@ -210,10 +212,11 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                 val linesToWrite = requestedLinesSet.associateWith { lineNumber ->
                     val lineOffsets =
                         state.offsets[lineNumber].takeIf { it.isNotEmpty() } ?: return@associateWith AnnotatedString("")
+                    val annotatedString = visualTransformation.filter(state.annotatedString).text
                     val lastOffset =
-                        if (lineOffsets.last() == state.text.lastIndex) state.text.length else lineOffsets.last()
+                        if (lineOffsets.last() == annotatedString.lastIndex) annotatedString.length else lineOffsets.last()
                     buildAnnotatedString {
-                        append(state.annotatedString, lineOffsets.first(), lastOffset)
+                        append(annotatedString, lineOffsets.first(), lastOffset)
                     }
                 }
                 AnimatedVisibility(showLineNumbers) {
