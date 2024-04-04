@@ -108,8 +108,13 @@ public inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBrack
         textFieldState.lineOffsets[finishLine]?.let { it + oldOffsetStart } ?: textFieldState.offsets[finishLine].last()
     if (position.column > (textFieldState.lineOffsets[finishLine] ?: Int.MAX_VALUE)) return@f null
     val token = textFieldState.tokens
-        .lastOrNull { it is Bracket && it.scopeChange == ScopeChange.OpensScope && it !in matchedBrackets }
-        ?.takeIf { it.text == openingBracket }
+        .lastOrNull {
+            it is Bracket && textFieldState.tokenOffsets[it]!!.last < textFieldState.selection.min &&
+            it.scopeChange == ScopeChange.OpensScope && it.text == openingBracket &&
+            matchedBrackets[it].let { paired ->
+                paired == null || textFieldState.tokenOffsets[paired as T]!!.first >= textFieldState.selection.max
+            }
+        }
         ?: return@f null
 
     val openTokenStartPosition = textFieldState.tokenPositions[token]?.first ?: return@f null
