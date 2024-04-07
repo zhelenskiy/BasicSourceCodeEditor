@@ -1,6 +1,7 @@
 package editor.basic
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -206,12 +208,16 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
             modifier = Modifier
                 .heightIn(max = maximumStickyHeaderHeight)
                 .background(backgroundColor)
-                .padding(innerPadding)
         ) {
+            val topPadding = innerPadding.calculateTopPadding()
+            val bottomPadding = innerPadding.calculateBottomPadding()
+            val startPadding = innerPadding.calculateStartPadding(LocalLayoutDirection.current)
+            val endPadding = innerPadding.calculateEndPadding(LocalLayoutDirection.current)
             Row(
                 modifier = Modifier
                     .width(this@StickyHeader.maxWidth)
                     .verticalScroll(rememberScrollState())
+                    .padding(top = topPadding, bottom = bottomPadding)
             ) {
                 val lineCount: Int = state.offsets.size
                 val linesToWrite = requestedLinesSet.associateWith { lineNumber ->
@@ -241,7 +247,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                                     text = "${lineNumber.inc()}",
                                     style = textStyle.copy(color = lineNumbersColor, textAlign = TextAlign.End),
                                     modifier = lineNumberModifier
-                                        .width(lineNumbersWidth)
+                                        .width(lineNumbersWidth + startPadding)
                                         .height(textHeightDp)
                                 )
                             }
@@ -250,7 +256,13 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                 }
                 BoxWithConstraints {
                     val outerScope = this
-                    BoxWithConstraints(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    val textFieldStartPadding by animateDpAsState(if (showLineNumbers) 0.dp else startPadding)
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = textFieldStartPadding, end = endPadding),
+                    ) {
                         val innerScope = this
                         var maxWidth by remember { mutableStateOf(outerScope.maxWidth) }
                         Wrapper(

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -332,14 +333,19 @@ public fun <T : Token> BasicSourceCodeTextField(
                 additionalOuterComposable(textLayout, innerComposable)
             }
         ) {
-            Row(modifier = Modifier.padding(innerPadding).verticalScroll(verticalScrollState).widthIn(minWidth)) {
+            Row(
+                modifier = Modifier
+                    .verticalScroll(verticalScrollState)
+                    .padding(top = innerTopPadding, bottom = innerBottomPadding)
+                    .widthIn(minWidth)
+            ) {
                 AnimatedVisibility(showLineNumbers) {
                     Column(horizontalAlignment = Alignment.End) {
                         repeat(state.offsets.size) {
                             BasicText(
                                 text = "${it + 1}",
                                 style = textStyle.copy(color = lineNumbersColor),
-                                modifier = lineNumberModifier.height(textHeightDp),
+                                modifier = lineNumberModifier.padding(start = innerStartPadding).height(textHeightDp),
                             )
                         }
                     }
@@ -433,8 +439,12 @@ public fun <T : Token> BasicSourceCodeTextField(
                         }
                     }
 
+                    val textFieldStartPadding by animateDpAsState(if (showLineNumbers) 0.dp else innerStartPadding)
+
                     BoxWithConstraints(
-                        modifier = Modifier.horizontalScroll(horizontalScrollState)
+                        modifier = Modifier
+                            .horizontalScroll(horizontalScrollState)
+                            .padding(start = textFieldStartPadding, end = innerEndPadding)
                     ) {
                         val innerSizes = this
                         var textFieldSize: IntSize? by remember { mutableStateOf(null) }
