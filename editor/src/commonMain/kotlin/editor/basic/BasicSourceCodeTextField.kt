@@ -31,6 +31,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
@@ -308,15 +309,18 @@ public fun <T : Token> BasicSourceCodeTextField(
     onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
     horizontalThresholdEdgeChars: Int = 5,
     verticalThresholdEdgeLines: Int = 1,
+    innerPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     val coroutineScope = rememberCoroutineScope()
     val textSize = measureText(textStyle)
     val textHeightDp = with(LocalDensity.current) { textSize.height.toDp() }
     var textLayout: TextLayoutResult? by remember(state.text) { mutableStateOf(null) }
 
+    val innerTopPadding = innerPadding.calculateTopPadding()
+    val innerBottomPadding = innerPadding.calculateBottomPadding()
     BoxWithConstraints(modifier) {
-        val editorOuterHeight = maxHeight
-        val editorOuterMinHeight = minHeight
+        val editorOuterHeight = maxHeight - innerBottomPadding - innerTopPadding
+        val editorOuterMinHeight = minHeight - innerBottomPadding - innerTopPadding
         val editorOuterHeightPx = with(LocalDensity.current) { editorOuterHeight.toPx() }
 
         Wrapper(
@@ -324,7 +328,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                 additionalOuterComposable(textLayout, innerComposable)
             }
         ) {
-            Row(modifier = Modifier.verticalScroll(verticalScrollState).widthIn(minWidth)) {
+            Row(modifier = Modifier.padding(innerPadding).verticalScroll(verticalScrollState).widthIn(minWidth)) {
                 AnimatedVisibility(showLineNumbers) {
                     Column(horizontalAlignment = Alignment.End) {
                         repeat(state.offsets.size) {

@@ -189,6 +189,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     lineNumberModifier: Modifier = defaultLineNumberModifier,
     lineStringModifier: Modifier = Modifier,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    innerPadding: PaddingValues = PaddingValues(0.dp),
     crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
     crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
@@ -201,12 +202,16 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     val requestedLinesSet = getStickyHeaderLines(topVisibleRow, state, matchedBrackets, stickyHeaderLinesChooser)
     if (requestedLinesSet.isEmpty()) return
     Column {
-        Column(Modifier.heightIn(max = maximumStickyHeaderHeight)) {
+        Column(
+            modifier = Modifier
+                .heightIn(max = maximumStickyHeaderHeight)
+                .background(backgroundColor)
+                .padding(innerPadding)
+        ) {
             Row(
                 modifier = Modifier
                     .width(this@StickyHeader.maxWidth)
                     .verticalScroll(rememberScrollState())
-                    .background(backgroundColor)
             ) {
                 val lineCount: Int = state.offsets.size
                 val linesToWrite = requestedLinesSet.associateWith { lineNumber ->

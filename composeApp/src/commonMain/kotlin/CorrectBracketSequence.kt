@@ -1,6 +1,9 @@
 import CorrectBracketSequenceToken.*
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.HorizontalDivider
@@ -10,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
@@ -122,6 +126,12 @@ fun CorrectBracketSequence() {
     var maximumStickyHeaderHeight: Dp by remember { mutableStateOf(0.dp) }
 
     val lineNumbersColor = Color.DarkGray
+    val innerPadding = PaddingValues(10.dp)
+    val stickyHeaderInnerPadding = PaddingValues(
+        start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
+        end = innerPadding.calculateEndPadding(LocalLayoutDirection.current),
+        top = innerPadding.calculateTopPadding(),
+    )
     BasicSourceCodeTextField(
         state = codeTextFieldState,
         onStateUpdate = { codeTextFieldState = it },
@@ -153,6 +163,7 @@ fun CorrectBracketSequence() {
                     maximumStickyHeaderHeight = (maxHeight / 3).also { maximumStickyHeaderHeight = it },
                     onClick = { coroutineScope.launch { externalScrollToFlow.emit(SourceCodePosition(it, 0)) } },
                     divider = { HorizontalDivider(thickness = 1.dp) },
+                    innerPadding = stickyHeaderInnerPadding,
                     additionalInnerComposable = { linesToWrite, _ ->
                         AnimatedVisibility(showIndentation) {
                             val lineMapping = linesToWrite.keys.withIndex().associate { (index, line) -> line to index }
@@ -171,6 +182,7 @@ fun CorrectBracketSequence() {
         textStyle = textStyle,
         verticalScrollState = verticalState,
         modifier = Modifier.fillMaxWidth().background(color = Color.White),
+        innerPadding = innerPadding,
         editorOffsetsForPosition = {
             EditorOffsets(
                 top = getOffsetForLineToAppearOnTop(
