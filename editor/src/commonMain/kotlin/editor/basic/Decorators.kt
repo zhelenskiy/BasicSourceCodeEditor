@@ -193,7 +193,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
     crossinline stickyHeaderLinesChooser: (Bracket) -> IntRange? = { bracket -> state.tokenLines[bracket as T] },
     crossinline onClick: (lineNumber: Int) -> Unit = {},
     crossinline onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
-    crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>, inner: @Composable () -> Unit) -> Unit = { _, _ -> },
+    crossinline additionalInnerComposable: @Composable BoxWithConstraintsScope.(linesToWrite: Map<Int, AnnotatedString>, inner: @Composable BoxWithConstraintsScope.() -> Unit) -> Unit = { _, _ -> },
 ) {
     val measuredText = measureText(textStyle)
     val textHeightDp = with(LocalDensity.current) { measuredText.height.toDp() }

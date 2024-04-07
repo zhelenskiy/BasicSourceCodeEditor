@@ -271,7 +271,7 @@ public val defaultLineNumberModifier: Modifier = Modifier.padding(start = 4.dp, 
 
 @Composable
 @PublishedApi
-internal fun Wrapper(content: @Composable (@Composable () -> Unit) -> Unit, inner: @Composable () -> Unit) {
+internal fun <T> T.Wrapper(content: @Composable T.(@Composable T.() -> Unit) -> Unit, inner: @Composable T.() -> Unit) {
     var called = false
     content {
         require(!called) { "Cannot call inner more than once!" }
@@ -289,8 +289,8 @@ public fun <T : Token> BasicSourceCodeTextField(
     onStateUpdate: (new: BasicSourceCodeTextFieldState<T>) -> Unit,
     preprocessors: List<Preprocessor> = emptyList(),
     tokenize: Tokenizer<T>,
-    additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable () -> Unit) -> Unit) = { _, _ -> },
-    additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable () -> Unit) -> Unit) = { _, _ -> },
+    additionalInnerComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable BoxWithConstraintsScope.() -> Unit) -> Unit) = { _, _ -> },
+    additionalOuterComposable: @Composable (BoxWithConstraintsScope.(textLayoutResult: TextLayoutResult?, inner: @Composable BoxWithConstraintsScope.() -> Unit) -> Unit) = { _, _ -> },
     textStyle: TextStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace),
     cursorBrush: Brush = SolidColor(Color.Black),
     showLineNumbers: Boolean = true,
@@ -318,13 +318,17 @@ public fun <T : Token> BasicSourceCodeTextField(
 
     val innerTopPadding = innerPadding.calculateTopPadding()
     val innerBottomPadding = innerPadding.calculateBottomPadding()
+    val innerStartPadding = innerPadding.calculateStartPadding(LocalLayoutDirection.current)
+    val innerEndPadding = innerPadding.calculateEndPadding(LocalLayoutDirection.current)
     BoxWithConstraints(modifier) {
         val editorOuterHeight = maxHeight - innerBottomPadding - innerTopPadding
         val editorOuterMinHeight = minHeight - innerBottomPadding - innerTopPadding
+        val editorOuterMinWidth = maxWidth - innerEndPadding - innerStartPadding
         val editorOuterHeightPx = with(LocalDensity.current) { editorOuterHeight.toPx() }
 
         Wrapper(
             content = { innerComposable ->
+                Box(Modifier.size(editorOuterMinWidth, editorOuterMinHeight))
                 additionalOuterComposable(textLayout, innerComposable)
             }
         ) {
