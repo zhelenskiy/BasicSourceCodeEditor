@@ -353,7 +353,7 @@ public fun <T : Token> BasicSourceCodeTextField(
 
 
                 BoxWithConstraints(modifier = Modifier.weight(1f)) {
-                    val editorOuterWidth = minWidth
+                    val editorOuterWidth = minWidth - innerStartPadding - innerEndPadding
                     val editorOuterWidthPx = with(LocalDensity.current) { editorOuterWidth.toPx() }
 
                     fun isCursorVisibleShortcut(): Boolean {
