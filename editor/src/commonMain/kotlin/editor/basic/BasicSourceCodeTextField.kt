@@ -311,6 +311,7 @@ public fun <T : Token> BasicSourceCodeTextField(
     horizontalThresholdEdgeChars: Int = 5,
     verticalThresholdEdgeLines: Int = 1,
     innerPadding: PaddingValues = PaddingValues(0.dp),
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val textSize = measureText(textStyle)
@@ -480,7 +481,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                                 keyboardOptions = KeyboardOptions.Default.copy(
                                     capitalization = KeyboardCapitalization.None,
                                     autoCorrect = false,
-                                    keyboardType = KeyboardType.Ascii,
+                                    keyboardType = keyboardType,
                                 ),
                                 cursorBrush = cursorBrush,
                                 onTextLayout = { textLayout = it },
