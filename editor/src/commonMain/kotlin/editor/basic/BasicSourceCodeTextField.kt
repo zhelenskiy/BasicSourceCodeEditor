@@ -28,8 +28,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -152,7 +151,23 @@ public fun combineKeyboardEventFilters(vararg filters: KeyboardEventFilter?): Ke
 
 public interface KeyboardEvent
 
-public data class PhysicalKeyboardEvent(val keyEvent: KeyEvent) : KeyboardEvent
+public data class PhysicalKeyboardEvent(
+    val key: Key, val utf16CodePoint: Int, val type: KeyEventType,
+    val isShiftPressed: Boolean = false,
+    val isCtrlPressed: Boolean = false,
+    val isAltPressed: Boolean = false,
+    val isMetaPressed: Boolean = false,
+) : KeyboardEvent {
+    public constructor(keyEvent: KeyEvent) : this(
+        key = keyEvent.key,
+        utf16CodePoint = keyEvent.utf16CodePoint,
+        type = keyEvent.type,
+        isShiftPressed = keyEvent.isShiftPressed,
+        isCtrlPressed = keyEvent.isCtrlPressed,
+        isAltPressed = keyEvent.isAltPressed,
+        isMetaPressed = keyEvent.isMetaPressed,
+    )
+}
 
 public sealed class UniversalKeyboardEvent : KeyboardEvent {
     public data object NonTextEvent : UniversalKeyboardEvent()

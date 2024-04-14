@@ -16,25 +16,14 @@ public fun PhysicalKeyboardEventFilter.asKeyboardEventFilter(): KeyboardEventFil
     it is PhysicalKeyboardEvent && invoke(it)
 }
 
-public typealias ComposeKeyEventHandler = (KeyEvent) -> TextFieldValue?
-public typealias ComposeKeyEventFilter = (KeyEvent) -> Boolean
-
-@JvmName("composeKeyboardEventHandlerAsKeyboardEventHandler")
-public fun ComposeKeyEventHandler.asKeyboardEventHandler(): KeyboardEventHandler =
-    { event: PhysicalKeyboardEvent -> invoke(event.keyEvent) }.asKeyboardEventHandler()
-
-@JvmName("composeKeyboardEventFilterAsKeyboardEventFilter")
-public fun ComposeKeyEventFilter.asKeyboardEventFilter(): KeyboardEventFilter =
-    { event: PhysicalKeyboardEvent -> invoke(event.keyEvent) }.asKeyboardEventFilter()
-
 public fun <T : Token> handleMovingOffsets(
     state: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4),
-    moveForwardFilter: KeyboardEventFilter = { keyEvent: KeyEvent ->
+    moveForwardFilter: KeyboardEventFilter = { keyEvent: PhysicalKeyboardEvent ->
         !keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
                 !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
     }.asKeyboardEventFilter(),
-    moveBackwardFilter: KeyboardEventFilter = { keyEvent: KeyEvent ->
+    moveBackwardFilter: KeyboardEventFilter = { keyEvent: PhysicalKeyboardEvent ->
         keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
                 !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
     }.asKeyboardEventFilter(),
