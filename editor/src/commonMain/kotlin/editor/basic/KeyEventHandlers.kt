@@ -3,21 +3,44 @@ package editor.basic
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import kotlin.jvm.JvmName
+
+public typealias PhysicalKeyboardEventHandler = (PhysicalKeyboardEvent) -> TextFieldValue?
+public typealias PhysicalKeyboardEventFilter = (PhysicalKeyboardEvent) -> Boolean
+
+public fun PhysicalKeyboardEventHandler.asKeyboardEventHandler(): KeyboardEventHandler = {
+    if (it is PhysicalKeyboardEvent) invoke(it) else null
+}
+
+public fun PhysicalKeyboardEventFilter.asKeyboardEventFilter(): KeyboardEventFilter = {
+    it is PhysicalKeyboardEvent && invoke(it)
+}
+
+public typealias ComposeKeyEventHandler = (KeyEvent) -> TextFieldValue?
+public typealias ComposeKeyEventFilter = (KeyEvent) -> Boolean
+
+@JvmName("composeKeyboardEventHandlerAsKeyboardEventHandler")
+public fun ComposeKeyEventHandler.asKeyboardEventHandler(): KeyboardEventHandler =
+    { event: PhysicalKeyboardEvent -> invoke(event.keyEvent) }.asKeyboardEventHandler()
+
+@JvmName("composeKeyboardEventFilterAsKeyboardEventFilter")
+public fun ComposeKeyEventFilter.asKeyboardEventFilter(): KeyboardEventFilter =
+    { event: PhysicalKeyboardEvent -> invoke(event.keyEvent) }.asKeyboardEventFilter()
 
 public fun <T : Token> handleMovingOffsets(
     state: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4),
-    moveForwardFilter: KeyEventFilter = { keyEvent ->
+    moveForwardFilter: KeyboardEventFilter = { keyEvent: KeyEvent ->
         !keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
                 !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
-    },
-    moveBackwardFilter: KeyEventFilter = { keyEvent ->
+    }.asKeyboardEventFilter(),
+    moveBackwardFilter: KeyboardEventFilter = { keyEvent: KeyEvent ->
         keyEvent.isShiftPressed && keyEvent.key == Key.Tab && keyEvent.type == KeyEventType.KeyDown &&
                 !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed
-    },
-): KeyEventHandler = f@{ keyEvent: KeyEvent ->
-    val moveForward = !state.selection.collapsed && moveForwardFilter(keyEvent)
-    val moveBackward = moveBackwardFilter(keyEvent)
+    }.asKeyboardEventFilter(),
+): KeyboardEventHandler = f@{ keyboardEvent: KeyboardEvent ->
+    val moveForward = !state.selection.collapsed && moveForwardFilter(keyboardEvent)
+    val moveBackward = moveBackwardFilter(keyboardEvent)
     if (moveBackward == moveForward) return@f null
     val selectionLines =
         state.sourceCodePositions[state.selection.min].line..state.sourceCodePositions[state.selection.max].line

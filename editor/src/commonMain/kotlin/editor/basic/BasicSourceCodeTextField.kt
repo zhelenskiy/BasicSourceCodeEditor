@@ -141,22 +141,24 @@ public data class EditorOffsets(
     val end: Int = 0,
 )
 
-public typealias CharEventHandler = (CharEvent) -> TextFieldValue?
+public typealias KeyboardEventHandler = (KeyboardEvent) -> TextFieldValue?
+public typealias KeyboardEventFilter = (KeyboardEvent) -> Boolean
 
-public fun combineCharEventHandlers(vararg handlers: CharEventHandler?): CharEventHandler =
+public fun combineKeyboardEventHandlers(vararg handlers: KeyboardEventHandler?): KeyboardEventHandler =
     { event -> handlers.firstNotNullOfOrNull { it?.invoke(event) } }
 
-public typealias KeyEventHandler = (KeyEvent) -> TextFieldValue?
-public typealias KeyEventFilter = (KeyEvent) -> Boolean
+public fun combineKeyboardEventFilters(vararg filters: KeyboardEventFilter?): KeyboardEventFilter =
+    { event -> filters.any { it?.invoke(event) == true } }
 
-public fun combineKeyEventHandlers(vararg handlers: KeyEventHandler?): KeyEventHandler =
-    { event -> handlers.firstNotNullOfOrNull { it?.invoke(event) } }
+public interface KeyboardEvent
 
-public sealed class CharEvent {
-    public data object NonTextEvent : CharEvent()
-    public data class Insert(val char: Char) : CharEvent()
-    public data object Backspace : CharEvent()
-    public data object Misc : CharEvent()
+public data class PhysicalKeyboardEvent(val keyEvent: KeyEvent) : KeyboardEvent
+
+public sealed class UniversalKeyboardEvent : KeyboardEvent {
+    public data object NonTextEvent : UniversalKeyboardEvent()
+    public data class Insert(val char: Char) : UniversalKeyboardEvent()
+    public data object Backspace : UniversalKeyboardEvent()
+    public data object Misc : UniversalKeyboardEvent()
 }
 
 private fun <T : Token> isBackSpace(
@@ -238,13 +240,13 @@ public fun <T : Token> initializeBasicSourceCodeTextFieldState(
     textFieldState: TextFieldValue,
     preprocessors: List<Preprocessor>,
     tokenize: Tokenizer<T>,
-    charEventHandler: CharEventHandler,
+    keyboardEventHandler: KeyboardEventHandler,
 ): BasicSourceCodeTextFieldState<T> = translate(
     textFieldState = textFieldState,
     preprocessors = preprocessors,
     tokenize = tokenize,
     state = BasicSourceCodeTextFieldState(),
-    charEventHandler = charEventHandler,
+    keyboardEventHandler = keyboardEventHandler,
 )
 
 private fun <T : Token> translate(
@@ -252,19 +254,19 @@ private fun <T : Token> translate(
     preprocessors: List<Preprocessor>,
     tokenize: Tokenizer<T>,
     state: BasicSourceCodeTextFieldState<T>,
-    charEventHandler: CharEventHandler,
+    keyboardEventHandler: KeyboardEventHandler,
 ): BasicSourceCodeTextFieldState<T> {
     val preprocessed =
         preprocessors.fold(textFieldState) { acc, preprocessor -> preprocessor(acc) }
     val charEvent = when {
-        state.text == textFieldState.text -> CharEvent.NonTextEvent
-        isBackSpace(state, textFieldState) -> CharEvent.Backspace
+        state.text == textFieldState.text -> UniversalKeyboardEvent.NonTextEvent
+        isBackSpace(state, textFieldState) -> UniversalKeyboardEvent.Backspace
         isCharInserted(state, textFieldState) ->
-            CharEvent.Insert(char = textFieldState.text[textFieldState.selection.start - 1])
+            UniversalKeyboardEvent.Insert(char = textFieldState.text[textFieldState.selection.start - 1])
 
-        else -> CharEvent.Misc
+        else -> UniversalKeyboardEvent.Misc
     }
-    val handledAsCharEvent = charEventHandler(charEvent) ?: preprocessed
+    val handledAsCharEvent = keyboardEventHandler(charEvent) ?: preprocessed
     return tokenize(handledAsCharEvent)
 }
 
@@ -305,8 +307,7 @@ public fun <T : Token> BasicSourceCodeTextField(
     lineNumberModifier: Modifier = defaultLineNumberModifier,
     editorOffsetsForPosition: (sourceCodePosition: SourceCodePosition) -> EditorOffsets = { EditorOffsets() },
     manualScrollToPosition: SharedFlow<SourceCodePosition> = remember { MutableSharedFlow() },
-    charEventHandler: CharEventHandler = { null },
-    keyEventHandler: KeyEventHandler = { null },
+    keyboardEventHandler: KeyboardEventHandler = { null },
     onHoveredSourceCodePositionChange: (position: SourceCodePosition) -> Unit = {},
     horizontalThresholdEdgeChars: Int = 5,
     verticalThresholdEdgeLines: Int = 1,
@@ -451,7 +452,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                         var textFieldSize: IntSize? by remember { mutableStateOf(null) }
 
                         fun translate(textFieldState: TextFieldValue) = translate(
-                            textFieldState, preprocessors, tokenize, state, charEventHandler
+                            textFieldState, preprocessors, tokenize, state, keyboardEventHandler
                         )
 
                         fun onValueChange(newTextFieldState: TextFieldValue) {
@@ -496,7 +497,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                                     )
                                     .onSizeChanged { textFieldSize = it }
                                     .onPreviewKeyEvent {
-                                        when (val eventResult = keyEventHandler(it)) {
+                                        when (val eventResult = keyboardEventHandler(PhysicalKeyboardEvent(it))) {
                                             null -> false
                                             else -> {
                                                 onValueChange(eventResult)

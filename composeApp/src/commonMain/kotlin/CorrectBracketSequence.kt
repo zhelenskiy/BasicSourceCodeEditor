@@ -197,95 +197,93 @@ fun CorrectBracketSequence() {
                 )
             )
         },
-        keyEventHandler = combineKeyEventHandlers(
+        keyboardEventHandler = combineKeyboardEventHandlers(
             handleMovingOffsets(
                 state = codeTextFieldState,
-            )
-        ),
-        charEventHandler = combineCharEventHandlers(
+            ),
             reusingCharsEventHandler(
                 textFieldState = codeTextFieldState,
                 chars = "])>}",
             ),
-            openingBracketCharEventHandler(
+            openingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingChar = '[',
                 openingBracket = "[",
                 closingBracket = "]",
                 addNewLinesForSelection = { false },
             ),
-            closingBracketCharEventHandler(
+            closingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "[",
                 closingBracket = "]",
                 closingChar = ']',
                 matchedBrackets = matchedBrackets,
             ),
-            openingBracketCharEventHandler(
+            openingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingChar = '(',
                 openingBracket = "(",
                 closingBracket = ")",
                 addNewLinesForSelection = { false },
             ),
-            closingBracketCharEventHandler(
+            closingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "(",
                 closingBracket = ")",
                 closingChar = ')',
                 matchedBrackets = matchedBrackets,
             ),
-            openingBracketCharEventHandler(
+            openingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingChar = '<',
                 openingBracket = "<",
                 closingBracket = ">",
                 addNewLinesForSelection = { false },
             ),
-            closingBracketCharEventHandler(
+            closingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "<",
                 closingBracket = ">",
                 closingChar = '>',
                 matchedBrackets = matchedBrackets,
             ),
-            openingBracketCharEventHandler(
+            openingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingChar = '{',
                 openingBracket = "{",
                 closingBracket = "}",
                 addNewLinesForSelection = { true },
             ),
-            closingBracketCharEventHandler(
+            closingBracketEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "{",
                 closingBracket = "}",
                 closingChar = '}',
                 matchedBrackets = matchedBrackets,
             ),
-            newLineCharEventHandler(
+            newLineEventHandler(
                 textFieldState = codeTextFieldState,
                 matchedBrackets = matchedBrackets,
             ),
-            removeIndentBackspaceCharEventHandler(
+            removeIndentBackspaceEventHandler(
                 textFieldState = codeTextFieldState,
             ),
-            removeEmptyBracesBackspaceCharEventHandler(
+            removeEmptyBracesBackspaceEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "[",
                 closingBracket = "]",
             ),
-            removeEmptyBracesBackspaceCharEventHandler(
+            removeEmptyBracesBackspaceEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "(",
                 closingBracket = ")",
             ),
-            removeEmptyBracesBackspaceCharEventHandler(
+            removeEmptyBracesBackspaceEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "<",
                 closingBracket = ">",
             ),
-            removeEmptyBracesBackspaceCharEventHandler(
+            removeEmptyBracesBackspaceEventHandler(
                 textFieldState = codeTextFieldState,
                 openingBracket = "{",
                 closingBracket = "}",

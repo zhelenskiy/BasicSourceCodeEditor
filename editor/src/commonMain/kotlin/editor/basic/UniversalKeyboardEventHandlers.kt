@@ -3,14 +3,24 @@ package editor.basic
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
+public typealias UniversalKeyboardEventHandler = (UniversalKeyboardEvent) -> TextFieldValue?
+public typealias UniversalKeyboardEventFilter = (UniversalKeyboardEvent) -> Boolean
 
-public fun <T : Token> openingBracketCharEventHandler(
+public fun UniversalKeyboardEventHandler.asKeyboardEventHandler(): KeyboardEventHandler = {
+    if (it is UniversalKeyboardEvent) invoke(it) else null
+}
+
+public fun UniversalKeyboardEventFilter.asKeyboardEventFilter(): KeyboardEventFilter = {
+    it is UniversalKeyboardEvent && invoke(it)
+}
+
+public fun <T : Token> openingBracketEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     openingChar: Char, openingBracket: String, closingBracket: String,
-    addNewLinesForSelection: (CharEvent.Insert) -> Boolean = { false },
+    addNewLinesForSelection: (UniversalKeyboardEvent.Insert) -> Boolean = { false },
     indent: String? = " ".repeat(4),
-): CharEventHandler = f@{ keyEvent ->
-    if (keyEvent !is CharEvent.Insert || keyEvent.char != openingChar) return@f null
+): KeyboardEventHandler = f@{ keyEvent ->
+    if (keyEvent !is UniversalKeyboardEvent.Insert || keyEvent.char != openingChar) return@f null
     val oldSelection = textFieldState.selection
     val minLine = textFieldState.sourceCodePositions[oldSelection.min].line
     val maxLine = textFieldState.sourceCodePositions[oldSelection.max].line
@@ -94,12 +104,12 @@ public fun <T : Token> openingBracketCharEventHandler(
     TextFieldValue(newString, newSelection, newComposition)
 }
 
-public inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBracketCharEventHandler(
+public inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBracketEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     openingBracket: String, closingChar: Char, closingBracket: String,
-): CharEventHandler = f@{ keyEvent ->
-    if (keyEvent !is CharEvent.Insert || keyEvent.char != closingChar) return@f null
+): KeyboardEventHandler = f@{ keyEvent ->
+    if (keyEvent !is UniversalKeyboardEvent.Insert || keyEvent.char != closingChar) return@f null
 
     val position = textFieldState.sourceCodePositions[textFieldState.selection.min]
     val finishLine = position.line
@@ -152,9 +162,9 @@ public inline fun <T : Token, reified Bracket : ScopeChangingToken> closingBrack
 public fun <T : Token> reusingCharsEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     chars: String,
-): CharEventHandler = f@{ keyEvent ->
+): KeyboardEventHandler = f@{ keyEvent ->
     if (
-        keyEvent !is CharEvent.Insert || keyEvent.char !in chars || !textFieldState.selection.collapsed ||
+        keyEvent !is UniversalKeyboardEvent.Insert || keyEvent.char !in chars || !textFieldState.selection.collapsed ||
         textFieldState.selection.start == textFieldState.text.length ||
         textFieldState.text[textFieldState.selection.start] != keyEvent.char
     ) return@f null
@@ -165,12 +175,12 @@ public fun <T : Token> reusingCharsEventHandler(
     )
 }
 
-public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newLineCharEventHandler(
+public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newLineEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     matchedBrackets: Map<Bracket, Bracket>,
     indent: String = " ".repeat(4),
-): CharEventHandler = f@{ keyEvent ->
-    if (keyEvent !is CharEvent.Insert || keyEvent.char != '\n') return@f null
+): KeyboardEventHandler = f@{ keyEvent ->
+    if (keyEvent !is UniversalKeyboardEvent.Insert || keyEvent.char != '\n') return@f null
     val currentLine = textFieldState.sourceCodePositions[textFieldState.selection.min].line
     val newIndents = textFieldState.tokens.filter {
         if (it !is Bracket) return@filter false
@@ -231,12 +241,12 @@ public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newL
     )
 }
 
-public fun <T : Token> removeIndentBackspaceCharEventHandler(
+public fun <T : Token> removeIndentBackspaceEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     indent: String = " ".repeat(4),
-): CharEventHandler = f@{ keyEvent ->
+): KeyboardEventHandler = f@{ keyEvent ->
     val offset = textFieldState.selection.start
-    if (keyEvent !is CharEvent.Backspace || !textFieldState.selection.collapsed || offset < indent.length) return@f null
+    if (keyEvent !is UniversalKeyboardEvent.Backspace || !textFieldState.selection.collapsed || offset < indent.length) return@f null
     val position = textFieldState.sourceCodePositions[offset]
     val line = position.line
     val lineOffset = textFieldState.lineOffsets[line]
@@ -257,14 +267,14 @@ public fun <T : Token> removeIndentBackspaceCharEventHandler(
     )
 }
 
-public fun <T : Token> removeEmptyBracesBackspaceCharEventHandler(
+public fun <T : Token> removeEmptyBracesBackspaceEventHandler(
     textFieldState: BasicSourceCodeTextFieldState<T>,
     openingBracket: String,
     closingBracket: String,
-): CharEventHandler = f@{ keyEvent ->
+): KeyboardEventHandler = f@{ keyEvent ->
     val offset = textFieldState.selection.start
     if (
-        keyEvent !is CharEvent.Backspace || !textFieldState.selection.collapsed || offset < openingBracket.length ||
+        keyEvent !is UniversalKeyboardEvent.Backspace || !textFieldState.selection.collapsed || offset < openingBracket.length ||
         offset + closingBracket.length > textFieldState.text.length
     ) return@f null
     for ((i, c) in openingBracket.withIndex()) {
