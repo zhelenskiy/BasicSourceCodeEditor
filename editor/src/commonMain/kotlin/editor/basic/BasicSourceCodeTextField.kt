@@ -176,10 +176,7 @@ public sealed class UniversalKeyboardEvent : KeyboardEvent {
     public data object Misc : UniversalKeyboardEvent()
 }
 
-private fun <T : Token> isBackSpace(
-    oldState: BasicSourceCodeTextFieldState<T>,
-    newState: TextFieldValue,
-): Boolean {
+private fun isBackSpace(oldState: TextFieldValue, newState: TextFieldValue): Boolean {
     if (isErasedSelectedContent(oldState, newState)) return true
     if (oldState.selection.collapsed && oldState.selection.start > 0) {
         return isErasedSelectedContent(
@@ -194,10 +191,7 @@ private fun <T : Token> isBackSpace(
     return false
 }
 
-private fun <T : Token> isErasedSelectedContent(
-    oldState: BasicSourceCodeTextFieldState<T>,
-    newState: TextFieldValue
-): Boolean {
+private fun isErasedSelectedContent(oldState: TextFieldValue, newState: TextFieldValue): Boolean {
     if (!newState.selection.collapsed) return false
     if (oldState.selection.collapsed) return false
     if (newState.selection.min != oldState.selection.min) return false
@@ -223,10 +217,7 @@ private fun <T : Token> isErasedSelectedContent(
     }
 }
 
-private fun <T : Token> isCharInserted(
-    oldState: BasicSourceCodeTextFieldState<T>,
-    newState: TextFieldValue
-): Boolean {
+private fun isCharInserted(oldState: TextFieldValue, newState: TextFieldValue): Boolean {
     if (!newState.selection.collapsed) return false
     if (newState.selection.min != oldState.selection.min + 1) return false
     if (newState.text.length != oldState.text.length - oldState.selection.length + 1) return false
@@ -271,19 +262,28 @@ private fun <T : Token> translate(
     state: BasicSourceCodeTextFieldState<T>,
     keyboardEventHandler: KeyboardEventHandler,
 ): BasicSourceCodeTextFieldState<T> {
-    val preprocessed =
-        preprocessors.fold(textFieldState) { acc, preprocessor -> preprocessor(acc) }
-    val charEvent = when {
-        state.text == textFieldState.text -> UniversalKeyboardEvent.NonTextEvent
-        isBackSpace(state, textFieldState) -> UniversalKeyboardEvent.Backspace
-        isCharInserted(state, textFieldState) ->
-            UniversalKeyboardEvent.Insert(char = textFieldState.text[textFieldState.selection.start - 1])
-
-        else -> UniversalKeyboardEvent.Misc
-    }
+    val preprocessed = preprocessors.fold(textFieldState) { acc, preprocessor -> preprocessor(acc) }
+    val charEvent = extractUniversalKeyboardEvent(state, textFieldState)
     val handledAsCharEvent = keyboardEventHandler(charEvent) ?: preprocessed
     return tokenize(handledAsCharEvent)
 }
+
+private fun <T : Token> extractUniversalKeyboardEvent(
+    state: BasicSourceCodeTextFieldState<T>, textFieldState: TextFieldValue
+) = extractUniversalKeyboardEvent(
+    TextFieldValue(state.annotatedString, state.selection, state.composition), textFieldState
+)
+
+
+public fun extractUniversalKeyboardEvent(oldState: TextFieldValue, newState: TextFieldValue): UniversalKeyboardEvent =
+    when {
+        oldState.text == newState.text -> UniversalKeyboardEvent.NonTextEvent
+        isBackSpace(oldState, newState) -> UniversalKeyboardEvent.Backspace
+        isCharInserted(oldState, newState) ->
+            UniversalKeyboardEvent.Insert(char = newState.text[newState.selection.start - 1])
+
+        else -> UniversalKeyboardEvent.Misc
+    }
 
 public val defaultLineNumberModifier: Modifier = Modifier.padding(start = 4.dp, end = 8.dp)
 
