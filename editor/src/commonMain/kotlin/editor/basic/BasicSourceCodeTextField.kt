@@ -180,12 +180,7 @@ private fun isBackSpace(oldState: TextFieldValue, newState: TextFieldValue): Boo
     if (isErasedSelectedContent(oldState, newState)) return true
     if (oldState.selection.collapsed && oldState.selection.start > 0) {
         return isErasedSelectedContent(
-            oldState.copy(
-                selection = TextRange(
-                    oldState.selection.end - 1,
-                    oldState.selection.end
-                )
-            ), newState
+            oldState.copy(selection = TextRange(oldState.selection.end - 1, oldState.selection.end)), newState
         )
     }
     return false
@@ -202,19 +197,8 @@ private fun isErasedSelectedContent(oldState: TextFieldValue, newState: TextFiel
     for (i in oldState.selection.max..<oldState.text.length) {
         if (newState.text[i - oldState.selection.length] != oldState.text[i]) return false
     }
-    fun map(offset: Int) = when {
-        offset >= oldState.selection.max -> offset - oldState.selection.length
-        offset <= oldState.selection.min -> offset
-        else -> newState.selection.min
-    }
-    return when (val oldComposition = oldState.composition) {
-        null -> newState.composition == null
-        else -> when (val newComposition = newState.composition) {
-            null -> false
-            else -> newComposition.start == map(oldComposition.start) &&
-                    newComposition.end == map(oldComposition.end)
-        }
-    }
+    // do not check composition as it is managed by IME
+    return true
 }
 
 private fun isCharInserted(oldState: TextFieldValue, newState: TextFieldValue): Boolean {
@@ -227,19 +211,8 @@ private fun isCharInserted(oldState: TextFieldValue, newState: TextFieldValue): 
     for (i in oldState.selection.max..<oldState.text.length) {
         if (newState.text[i - oldState.selection.length + 1] != oldState.text[i]) return false
     }
-    fun map(offset: Int) = when {
-        offset >= oldState.selection.max -> offset - oldState.selection.length + 1
-        offset <= oldState.selection.min -> offset
-        else -> newState.selection.min
-    }
-    return when (val oldComposition = oldState.composition) {
-        null -> newState.composition == null
-        else -> when (val newComposition = newState.composition) {
-            null -> false
-            else -> newComposition.start == map(oldComposition.start) &&
-                    newComposition.end == map(oldComposition.end)
-        }
-    }
+    // do not check composition as it is managed by IME
+    return true
 }
 
 public fun <T : Token> initializeBasicSourceCodeTextFieldState(
