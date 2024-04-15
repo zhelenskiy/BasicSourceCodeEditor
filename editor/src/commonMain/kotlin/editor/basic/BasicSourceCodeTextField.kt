@@ -152,7 +152,7 @@ public fun combineKeyboardEventFilters(vararg filters: KeyboardEventFilter?): Ke
 public interface KeyboardEvent
 
 public data class PhysicalKeyboardEvent(
-    val key: Key, val utf16CodePoint: Int, val type: KeyEventType,
+    val key: Key, val type: KeyEventType,
     val isShiftPressed: Boolean = false,
     val isCtrlPressed: Boolean = false,
     val isAltPressed: Boolean = false,
@@ -160,7 +160,6 @@ public data class PhysicalKeyboardEvent(
 ) : KeyboardEvent {
     public constructor(keyEvent: KeyEvent) : this(
         key = keyEvent.key,
-        utf16CodePoint = keyEvent.utf16CodePoint,
         type = keyEvent.type,
         isShiftPressed = keyEvent.isShiftPressed,
         isCtrlPressed = keyEvent.isCtrlPressed,
