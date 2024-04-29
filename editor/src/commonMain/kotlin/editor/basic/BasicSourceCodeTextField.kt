@@ -463,7 +463,11 @@ public fun <T : Token> BasicSourceCodeTextField(
                                     selection = state.selection,
                                     composition = state.composition,
                                 ),
-                                onValueChange = { onValueChange(it) },
+                                onValueChange = {
+                                    if (it.selection != state.selection || it.composition != state.composition || it.text != state.text) {
+                                        onValueChange(it)
+                                    }
+                                },
                                 maxLines = Int.MAX_VALUE,
                                 textStyle = textStyle,
                                 keyboardOptions = KeyboardOptions.Default.copy(
