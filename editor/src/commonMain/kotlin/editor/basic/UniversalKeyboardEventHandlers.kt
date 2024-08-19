@@ -185,24 +185,31 @@ public inline fun <reified T : Token, reified Bracket : ScopeChangingToken> newL
     val newIndents = textFieldState.tokens.filter {
         if (it !is Bracket) return@filter false
         if (it.scopeChange != ScopeChange.OpensScope) return@filter false
+        val openBracketOffset = textFieldState.tokenOffsets[it]?.last ?: return@filter false
         val match = matchedBrackets[it]
         if (match != null) {
             val matchStartOffset = textFieldState.tokenOffsets[match as T]?.first ?: return@filter false
-            if (matchStartOffset < textFieldState.selection.min) return@filter false
+            if (matchStartOffset < textFieldState.selection.min || openBracketOffset >= textFieldState.selection.max) return@filter false
         }
-        textFieldState.tokenLines[it]?.last == currentLine &&
-                textFieldState.tokenOffsets[it].let { it != null && it.last <= textFieldState.selection.min }
+        textFieldState.tokenLines[it]?.last == currentLine && openBracketOffset <= textFieldState.selection.min
     }
     var diffLength = 0
     val newText = buildString {
         appendRange(textFieldState.text, 0, textFieldState.selection.min)
+
         append('\n')
         diffLength += 1
+
         val currentLineStartOffset = textFieldState.offsets[currentLine].first()
-        val currentLineEndOffset = textFieldState.lineOffsets[currentLine]?.let { it + currentLineStartOffset }
-            ?: textFieldState.offsets[currentLine].last()
+        val currentLineEndOffset = minOf(
+            textFieldState.selection.min,
+            textFieldState.lineOffsets[currentLine]
+                ?.let { it + currentLineStartOffset }
+                ?: textFieldState.offsets[currentLine].last()
+        )
         diffLength += currentLineEndOffset - currentLineStartOffset
         appendRange(textFieldState.text, currentLineStartOffset, currentLineEndOffset)
+
         repeat(newIndents.size) {
             append(indent)
             diffLength += indent.length
