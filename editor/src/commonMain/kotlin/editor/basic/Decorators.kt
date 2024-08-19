@@ -6,6 +6,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,9 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.*
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
@@ -271,6 +270,7 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                             }
                         ) {
                             Column {
+                                val selectionColor = LocalTextSelectionColors.current.backgroundColor
                                 for ((lineNumber, annotatedString) in linesToWrite) {
                                     Box(
                                         modifier = Modifier
@@ -281,8 +281,31 @@ public inline fun <reified Bracket : ScopeChangingToken, T : Token> BoxWithConst
                                             )
                                             .fillMaxWidth()
                                     ) {
+                                        val selection = run {
+                                            val lineStartOffset = state.offsets[lineNumber].first()
+                                            val lineEndOffset = state.offsets[lineNumber].last()
+                                            val globalSelectionStart = state.selection.min
+                                            val globalSelectionEnd = state.selection.max
+                                            if (globalSelectionStart >= lineEndOffset) return@run null
+                                            if (globalSelectionEnd <= lineStartOffset) return@run null
+                                            val selectionStartOffset = maxOf(globalSelectionStart, lineStartOffset)
+                                            val selectionEndOffset = minOf(globalSelectionEnd, lineEndOffset)
+                                            if (selectionStartOffset == selectionEndOffset) return@run null
+                                            selectionStartOffset - lineStartOffset to selectionEndOffset - lineStartOffset
+                                        }
+                                        val annotatedStringWithSelection = if (selection != null) {
+                                            buildAnnotatedString {
+                                                append(annotatedString, 0, selection.first)
+                                                withStyle(SpanStyle(background = selectionColor)) {
+                                                    append(annotatedString, selection.first, selection.second)
+                                                }
+                                                append(annotatedString, selection.second, annotatedString.length)
+                                            }
+                                        } else {
+                                            annotatedString
+                                        }
                                         BasicText(
-                                            text = annotatedString,
+                                            text = annotatedStringWithSelection,
                                             style = textStyle,
                                             modifier = lineStringModifier
                                                 .height(textHeightDp)
