@@ -472,7 +472,7 @@ public fun <T : Token> BasicSourceCodeTextField(
                                 textStyle = textStyle,
                                 keyboardOptions = KeyboardOptions.Default.copy(
                                     capitalization = KeyboardCapitalization.None,
-                                    autoCorrect = false,
+                                    autoCorrectEnabled = false,
                                     keyboardType = keyboardType,
                                 ),
                                 cursorBrush = cursorBrush,
